@@ -1,0 +1,72 @@
+# ------------------------------
+# Reference-only extracted data
+# ------------------------------
+# Keep local copies for study/comparison, but prevent accidental commits.
+/base-game/
+/mod-reference/
+
+# ------------------------------
+# OS junk
+# ------------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+.Spotlight-V100/
+.Trashes/
+
+# ------------------------------
+# Editor / IDE
+# ------------------------------
+.vscode/
+.idea/
+*.code-workspace
+*.suo
+*.user
+*.userossc
+*.sln.docstates
+*.swp
+*.swo
+*~
+
+# ------------------------------
+# Logs, temp, cache
+# ------------------------------
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+.cache/
+.eslintcache
+
+# ------------------------------
+# Local tooling environments
+# ------------------------------
+.venv/
+venv/
+node_modules/
+
+# ------------------------------
+# Test / debug artifacts
+# ------------------------------
+coverage/
+.coverage
+.coverage.*
+test-output/
+playwright-report/
+
+# ------------------------------
+# Build / package artifacts
+# ------------------------------
+dist/
+build/
+out/
+exports/
+release/
+/mod/dist/
+/mod/build/
+/mod/export/
+/mod/exports/
+/mod/*.zip
