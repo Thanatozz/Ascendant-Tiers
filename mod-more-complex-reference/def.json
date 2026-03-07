@@ -1,0 +1,29 @@
+{
+	"name": "Resynced",
+	"id": "Resynced",
+	"version_name": "2.3.16",
+	"version_code": 1,
+	"author": "Kporal",
+	"homepage": "https://steamcommunity.com/id/cplshade/",
+	"description": "Extend the base content of Desynced with functionality and options with configurable module.",
+	"options": "options.lua",
+	"disabled_by_default": true,
+	"packages": {
+		"Main": {
+			"name": "Main",
+			"entry": "main.lua",
+			"dependencies": [ "Main/Data" ],
+			"type": "Addon"
+		},
+		"Languages": {
+            "name": "Translations",
+            "languagesdir": "translations",
+            "type": "Translation",
+            "languages": {
+                "en": "English (American)",
+                "fr": "French",
+				"zh_tw": "Chinese (Traditional)"
+            }
+        }
+	}
+}

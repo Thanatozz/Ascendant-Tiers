@@ -1,0 +1,17 @@
+{
+	"id": "AscendantTiers",
+	"name": "Ascendant Tiers",
+	"version_name": "0.1.0",
+	"version_code": 1,
+	"author": "Ascendant Tiers Team",
+	"description": "Extends vanilla progression with complete T2 modular buildings, components, and robot variants.",
+	"options": "options.lua",
+	"packages": {
+		"Data": {
+			"name": "Data",
+			"entry": "data.lua",
+			"dependencies": [ "Main/Data" ],
+			"type": "Addon"
+		}
+	}
+}
