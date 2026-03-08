@@ -2,6 +2,7 @@ local package = ...
 
 package.includes = {
 	"items/mod_material_progression.lua",
+	"descriptions/t2_description_overrides.lua",
 	"frames/modular_building_upgrades.lua",
 	"components/t2_component_variants.lua",
 	"frames/t2_robot_unit_variants.lua",

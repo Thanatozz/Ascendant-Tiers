@@ -187,6 +187,50 @@ local function ensure_scaled_visual(base_visual_id, t2_visual_id)
 	return t2_visual_id
 end
 
+local function recipe_uses_t2_ic_chip(recipe)
+	local ingredients = recipe and recipe.ingredients
+	local chip_count = type(ingredients) == "table" and ingredients.ascendant_tiers_ic_chip
+	return type(chip_count) == "number" and chip_count > 0
+end
+
+local function resolve_t2_desc_override(frame_id, frame_def, fallback_desc)
+	local function ensure_t2_prefix(text)
+		if type(text) ~= "string" then
+			return "<hl>[T2]</> Ascendant Tiers frame upgrade."
+		end
+		if text:find("%[T2%]") then
+			return text
+		end
+		return "<hl>[T2]</> " .. text
+	end
+
+	local overrides = data.ascendant_tiers_t2_description_overrides
+	if type(overrides) ~= "table" then
+		return ensure_t2_prefix(fallback_desc)
+	end
+
+	local override = overrides[frame_id]
+	if type(override) == "string" and override ~= "" then
+		return ensure_t2_prefix(override)
+	end
+
+	if type(override) == "function" then
+		local ok, result = pcall(override, frame_def)
+		if ok and type(result) == "string" and result ~= "" then
+			return ensure_t2_prefix(result)
+		end
+	end
+
+	return ensure_t2_prefix(fallback_desc)
+end
+
+local function resolve_unlock_stage(entry, frame_def)
+	if entry.stage < 3 and recipe_uses_t2_ic_chip(frame_def and frame_def.construction_recipe) then
+		return 3
+	end
+	return entry.stage
+end
+
 local stage_unlocks = { [1] = {}, [2] = {}, [3] = {}, [4] = {} }
 local next_index = 9300
 
@@ -196,7 +240,9 @@ for _, entry in ipairs(building_plan) do
 		local frame_def = clone_table(base_frame)
 		frame_def.index = next_index
 		frame_def.name = entry.name or string.format("%s [T2]", base_frame.name or entry.base_id)
-		frame_def.desc = (base_frame.desc or "Ascendant Tiers frame variant.") .. " Ascendant Tiers T2 upgrade with expanded socket capacity."
+		local fallback_desc = (base_frame.desc or "Ascendant Tiers frame variant.") ..
+			" Ascendant Tiers T2 upgrade with expanded socket capacity."
+		frame_def.desc = resolve_t2_desc_override(entry.t2_id, frame_def, fallback_desc)
 		frame_def.texture = texture_overrides[entry.t2_id] or base_frame.texture
 		frame_def.construction_recipe =
 			apply_construction_recipe_overrides(entry.t2_id, build_t2_construction_recipe(base_frame) or base_frame.construction_recipe)
@@ -211,6 +257,7 @@ for _, entry in ipairs(building_plan) do
 
 		if type(frame_def.slots) == "table" and type(frame_def.slots.storage) == "number" and entry.storage_mult then
 			frame_def.slots.storage = math.max(1, math.ceil(frame_def.slots.storage * entry.storage_mult))
+			frame_def.desc = resolve_t2_desc_override(entry.t2_id, frame_def, frame_def.desc)
 		end
 
 		local visual_id = entry.visual_id or (base_frame.visual .. "_" .. entry.t2_id)
@@ -220,8 +267,10 @@ for _, entry in ipairs(building_plan) do
 		next_index = next_index + 1
 	end
 
-	if data.frames[entry.t2_id] then
-		table.insert(stage_unlocks[entry.stage], entry.t2_id)
+	local unlocked_frame = data.frames[entry.t2_id]
+	if unlocked_frame then
+		local unlock_stage = resolve_unlock_stage(entry, unlocked_frame)
+		table.insert(stage_unlocks[unlock_stage], entry.t2_id)
 	end
 end
 

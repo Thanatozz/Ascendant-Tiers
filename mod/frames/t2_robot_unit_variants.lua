@@ -91,6 +91,9 @@ local t2_material_map = {
 	energized_plate = "ascendant_tiers_energized_plate",
 	hdframe = "ascendant_tiers_high_density_frame",
 	high_density_frame = "ascendant_tiers_high_density_frame",
+	circuit_board = "ascendant_tiers_circuit_board",
+	icchip = "ascendant_tiers_ic_chip",
+	ic_chip = "ascendant_tiers_ic_chip",
 }
 
 local function map_to_t2_if_available(item_id)
@@ -123,6 +126,37 @@ local function build_t2_production_recipe(base_frame)
 	return CreateProductionRecipe(ingredients, producers, base_recipe.amount or 1)
 end
 
+local function resolve_t2_desc_override(frame_id, frame_def, fallback_desc)
+	local function ensure_t2_prefix(text)
+		if type(text) ~= "string" then
+			return "<hl>[T2]</> Ascendant Tiers robot-unit upgrade."
+		end
+		if text:find("%[T2%]") then
+			return text
+		end
+		return "<hl>[T2]</> " .. text
+	end
+
+	local overrides = data.ascendant_tiers_t2_description_overrides
+	if type(overrides) ~= "table" then
+		return ensure_t2_prefix(fallback_desc)
+	end
+
+	local override = overrides[frame_id]
+	if type(override) == "string" and override ~= "" then
+		return ensure_t2_prefix(override)
+	end
+
+	if type(override) == "function" then
+		local ok, result = pcall(override, frame_def)
+		if ok and type(result) == "string" and result ~= "" then
+			return ensure_t2_prefix(result)
+		end
+	end
+
+	return ensure_t2_prefix(fallback_desc)
+end
+
 local unit_plan = {
 	{ id = "f_carrier_bot", stage = 1 },
 	{ id = "f_bot_1s_a", stage = 1 },
@@ -152,7 +186,9 @@ for _, entry in ipairs(unit_plan) do
 			local frame_def = clone_table(base_frame)
 			frame_def.index = next_index
 			frame_def.name = string.format("%s [T2]", base_frame.name or entry.id)
-			frame_def.desc = (base_frame.desc or "Ascendant Tiers robot unit variant.") .. " Ascendant Tiers T2 variant with expanded socket capacity."
+			local fallback_desc = (base_frame.desc or "Ascendant Tiers robot unit variant.") ..
+				" Ascendant Tiers T2 variant with expanded socket capacity."
+			frame_def.desc = resolve_t2_desc_override(t2_id, frame_def, fallback_desc)
 			frame_def.texture = string.format("AscendantTiers/textures/icons/frame/%s_t2.png", entry.id)
 			frame_def.production_recipe = build_t2_production_recipe(base_frame) or base_frame.production_recipe
 			frame_def.slots = clone_table(base_frame.slots)
@@ -177,6 +213,7 @@ for _, entry in ipairs(unit_plan) do
 			if not unit_has_sml_sockets then
 				scale_inventory_slots(frame_def.slots, 2.0)
 				scale_movement_speed(frame_def, 1.5)
+				frame_def.desc = resolve_t2_desc_override(t2_id, frame_def, frame_def.desc)
 			end
 
 			Frame:RegisterFrame(t2_id, frame_def)

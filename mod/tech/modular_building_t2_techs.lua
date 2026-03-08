@@ -35,7 +35,6 @@ data.techs.tech_small_buildings_t2 = {
 	unlocks = merge_unlocks(building_unlocks[1], {
 		"ascendant_tiers_metal_plate",
 		"ascendant_tiers_circuit_board",
-		"ascendant_tiers_ic_chip",
 		"ascendant_tiers_reinforced_plate",
 	}),
 }
@@ -64,6 +63,7 @@ data.techs.tech_large_buildings_t2 = {
 	require_tech = { "tech_medium_buildings_t2" },
 	category = "Ascendant Tiers",
 	unlocks = merge_unlocks(building_unlocks[3], {
+		"ascendant_tiers_ic_chip",
 		"ascendant_tiers_high_density_frame",
 	}),
 }

@@ -26,6 +26,14 @@ local function add_amount(target, item_id, amount)
 	target[item_id] = (target[item_id] or 0) + amount
 end
 
+local function is_component_id(item_id)
+	return type(item_id) == "string" and item_id:sub(1, 2) == "c_"
+end
+
+local function to_t2_component_id(component_id)
+	return component_id .. "_t2"
+end
+
 local function as_set(list)
 	local result = {}
 	for _, id in ipairs(list) do
@@ -71,6 +79,23 @@ local energy_generation_components = as_set({
 	"c_power_core",
 })
 
+local battery_components = as_set({
+	"c_small_battery",
+	"c_capacitor",
+	"c_medium_capacitor",
+	"c_battery",
+	"c_power_cell",
+	"c_power_core",
+})
+
+local power_field_components = as_set({
+	"c_portable_relay",
+	"c_small_relay",
+	"c_power_relay",
+	"c_power_transmitter",
+	"c_large_power_transmitter",
+})
+
 local miner_components = as_set({
 	"c_miner",
 	"c_adv_miner",
@@ -84,7 +109,11 @@ local function build_t2_production_recipe(base_component)
 
 	local ingredients = {}
 	for item_id, amount in pairs(base_recipe.ingredients) do
-		add_amount(ingredients, map_to_t2_material_if_available(item_id), amount)
+		if is_component_id(item_id) then
+			add_amount(ingredients, to_t2_component_id(item_id), amount)
+		else
+			add_amount(ingredients, map_to_t2_material_if_available(item_id), amount * 2)
+		end
 	end
 
 	local producers = {}
@@ -98,12 +127,22 @@ local function build_t2_production_recipe(base_component)
 end
 
 local function apply_recipe_overrides(component_id, recipe)
-	if component_id ~= "c_miner_t2" or type(recipe) ~= "table" or type(recipe.ingredients) ~= "table" then
+	if type(recipe) ~= "table" or type(recipe.ingredients) ~= "table" then
 		return recipe
 	end
 
-	recipe.ingredients.metalbar = nil
-	recipe.ingredients.ascendant_tiers_metal_plate = 3
+	if component_id == "c_miner_t2" then
+		local metalbar_count = recipe.ingredients.metalbar
+		if type(metalbar_count) == "number" and metalbar_count > 0 then
+			recipe.ingredients.metalbar = nil
+			recipe.ingredients.ascendant_tiers_metal_plate =
+				(recipe.ingredients.ascendant_tiers_metal_plate or 0) + metalbar_count
+		end
+	elseif component_id == "c_portable_relay_t2" then
+		recipe.ingredients.metalbar = nil
+		recipe.ingredients.ascendant_tiers_metal_plate = 5
+	end
+
 	return recipe
 end
 
@@ -124,9 +163,18 @@ local field_desc_keywords = {
 	damage = { "damage", "damages" },
 	dotdps = { "dps", "dot", "burn" },
 	power = { "power", "energy" },
+	drain_rate = { "drain", "consumes", "consumption", "upkeep" },
 	max_power = { "power", "energy" },
 	solar_power_generated = { "solar", "sunlight" },
 	solar_power_summer = { "solar", "summer" },
+	power_storage = { "storage", "capacity", "battery", "energy" },
+	power_capacity = { "storage", "capacity", "battery", "energy" },
+	transfer_radius = { "range", "radius", "field", "relay", "transmit" },
+	range = { "range", "radius", "field", "relay", "transmit" },
+	power_range = { "range", "radius", "field", "relay", "transmit" },
+	relay_range = { "range", "radius", "field", "relay", "transmit" },
+	field_radius = { "range", "radius", "field", "relay", "transmit" },
+	radius = { "range", "radius", "field", "relay", "transmit" },
 }
 
 local function format_number(value)
@@ -144,49 +192,64 @@ local function format_number(value)
 	return text
 end
 
-local function is_number_char(ch)
-	return type(ch) == "string" and ch ~= "" and ch:match("[%d%.]") ~= nil
+local function find_numeric_token_equal(text, from_index, to_index, target_number)
+	local cursor = from_index
+	while cursor <= to_index do
+		local start_pos, end_pos, token = text:find("([-+]?%d+%.?%d*)", cursor)
+		if not start_pos or start_pos > to_index then
+			return nil, nil
+		end
+
+		if end_pos <= to_index then
+			local token_number = tonumber(token)
+			if token_number and math.abs(token_number - target_number) < 0.0001 then
+				return start_pos, end_pos
+			end
+		end
+
+		cursor = end_pos + 1
+	end
+
+	return nil, nil
 end
 
-local function replace_number_near_keyword(text, keyword, old_value, new_value)
+local function replace_number_near_keyword(text, keyword, old_number, new_value)
 	if type(text) ~= "string" or text == "" then
 		return text, false
 	end
 
 	local lower = text:lower()
 	local search_from = 1
-	local old_len = #old_value
 	while true do
 		local keyword_start, keyword_end = lower:find(keyword, search_from, true)
 		if not keyword_start then
 			return text, false
 		end
 
-		local window_start = math.max(1, keyword_start - 48)
-		local window_end = math.min(#text, keyword_end + 48)
-		local window = text:sub(window_start, window_end)
-
-		local value_search = 1
-		while true do
-			local pos = window:find(old_value, value_search, true)
-			if not pos then
-				break
-			end
-
-			local global_start = window_start + pos - 1
-			local before = global_start > 1 and text:sub(global_start - 1, global_start - 1) or ""
-			local after_index = global_start + old_len
-			local after = after_index <= #text and text:sub(after_index, after_index) or ""
-			if not is_number_char(before) and not is_number_char(after) then
-				local replaced = text:sub(1, global_start - 1) .. new_value .. text:sub(global_start + old_len)
-				return replaced, true
-			end
-
-			value_search = pos + 1
+		local window_start = math.max(1, keyword_start - 120)
+		local window_end = math.min(#text, keyword_end + 120)
+		local number_start, number_end = find_numeric_token_equal(text, window_start, window_end, old_number)
+		if number_start and number_end then
+			local replaced = text:sub(1, number_start - 1) .. new_value .. text:sub(number_end + 1)
+			return replaced, true
 		end
 
 		search_from = keyword_end + 1
 	end
+end
+
+local function replace_number_anywhere(text, old_number, new_value)
+	if type(text) ~= "string" or text == "" then
+		return text, false
+	end
+
+	local number_start, number_end = find_numeric_token_equal(text, 1, #text, old_number)
+	if not number_start or not number_end then
+		return text, false
+	end
+
+	local replaced = text:sub(1, number_start - 1) .. new_value .. text:sub(number_end + 1)
+	return replaced, true
 end
 
 local function replace_stat_values_in_desc(base_desc, stat_changes)
@@ -196,15 +259,19 @@ local function replace_stat_values_in_desc(base_desc, stat_changes)
 
 	local updated_desc = base_desc
 	for _, change in ipairs(stat_changes) do
-		local old_value = format_number(change.old_value)
+		local old_number = tonumber(change.old_value)
 		local new_value = format_number(change.new_value)
-		if old_value ~= new_value then
+		if old_number and format_number(old_number) ~= new_value then
 			local replaced = false
 			for _, keyword in ipairs(change.keywords or {}) do
-				updated_desc, replaced = replace_number_near_keyword(updated_desc, keyword, old_value, new_value)
+				updated_desc, replaced = replace_number_near_keyword(updated_desc, keyword, old_number, new_value)
 				if replaced then
 					break
 				end
+			end
+
+			if not replaced then
+				updated_desc, replaced = replace_number_anywhere(updated_desc, old_number, new_value)
 			end
 		end
 	end
@@ -283,6 +350,58 @@ local function apply_primary_role_scaling(base_component_id, base_component, com
 		end
 	end
 
+	if battery_components[base_component_id] then
+		local scaled_storage = scaled_number(base_component, "power_storage", 2, true)
+		if scaled_storage then
+			component_def.power_storage = scaled_storage
+			collect_stat_change(base_component, "power_storage", scaled_storage, stat_changes)
+		end
+
+		local scaled_capacity = scaled_number(base_component, "power_capacity", 2, true)
+		if scaled_capacity then
+			component_def.power_capacity = scaled_capacity
+			collect_stat_change(base_component, "power_capacity", scaled_capacity, stat_changes)
+		end
+	end
+
+	if base_component_id == "c_crystal_power" then
+		local scaled_drain = scaled_number(base_component, "drain_rate", 2, true)
+		if scaled_drain then
+			component_def.drain_rate = scaled_drain
+			collect_stat_change(base_component, "drain_rate", scaled_drain, stat_changes)
+		end
+
+		local scaled_storage = scaled_number(base_component, "power_storage", 2, true)
+		if scaled_storage then
+			component_def.power_storage = scaled_storage
+			collect_stat_change(base_component, "power_storage", scaled_storage, stat_changes)
+		end
+
+		local scaled_capacity = scaled_number(base_component, "power_capacity", 2, true)
+		if scaled_capacity then
+			component_def.power_capacity = scaled_capacity
+			collect_stat_change(base_component, "power_capacity", scaled_capacity, stat_changes)
+		end
+
+		local base_power = base_component.power
+		if type(base_power) == "number" and base_power < 0 then
+			local scaled_negative_power = base_power * 2
+			component_def.power = scaled_negative_power
+			collect_stat_change(base_component, "power", scaled_negative_power, stat_changes)
+		end
+	end
+
+	if power_field_components[base_component_id] then
+		local range_fields = { "transfer_radius", "range", "power_range", "relay_range", "field_radius", "radius" }
+		for _, field in ipairs(range_fields) do
+			local scaled_range = scaled_number(base_component, field, 2, true)
+			if scaled_range then
+				component_def[field] = scaled_range
+				collect_stat_change(base_component, field, scaled_range, stat_changes)
+			end
+		end
+	end
+
 	return stat_changes
 end
 
@@ -305,11 +424,45 @@ local function upgraded_desc(base_component, base_name, stat_changes)
 	local desc_body = replace_stat_values_in_desc(original_desc, stat_changes or {})
 	if desc_body == "" then
 		desc_body = string.format(
-			"%s [T2] variant with 2x efficiency in its primary function (role-focused, not 2x every stat).",
+			"%s variant with 2x efficiency in its primary function (role-focused, not 2x every stat).",
 			base_name
 		)
 	end
-	return "Mejorado: " .. desc_body
+	if desc_body:find("%[T2%]") then
+		return desc_body
+	end
+	return "<hl>[T2]</> " .. desc_body
+end
+
+local function resolve_t2_desc_override(item_id, item_def, fallback_desc)
+	local function ensure_t2_prefix(text)
+		if type(text) ~= "string" then
+			return "<hl>[T2]</> Ascendant Tiers component upgrade."
+		end
+		if text:find("%[T2%]") then
+			return text
+		end
+		return "<hl>[T2]</> " .. text
+	end
+
+	local overrides = data.ascendant_tiers_t2_description_overrides
+	if type(overrides) ~= "table" then
+		return ensure_t2_prefix(fallback_desc)
+	end
+
+	local override = overrides[item_id]
+	if type(override) == "string" and override ~= "" then
+		return ensure_t2_prefix(override)
+	end
+
+	if type(override) == "function" then
+		local ok, result = pcall(override, item_def)
+		if ok and type(result) == "string" and result ~= "" then
+			return ensure_t2_prefix(result)
+		end
+	end
+
+	return ensure_t2_prefix(fallback_desc)
 end
 
 local component_plan = {
@@ -391,7 +544,8 @@ for _, entry in ipairs(component_plan) do
 				production_recipe = apply_recipe_overrides(t2_id, build_t2_production_recipe(base_component)),
 			}
 			local stat_changes = apply_primary_role_scaling(entry.id, base_component, component_def)
-			component_def.desc = upgraded_desc(base_component, base_name, stat_changes)
+			local fallback_desc = upgraded_desc(base_component, base_name, stat_changes)
+			component_def.desc = resolve_t2_desc_override(t2_id, component_def, fallback_desc)
 
 			base_component:RegisterComponent(t2_id, component_def)
 			apply_mining_speed_overrides(entry.id, t2_id)
@@ -403,7 +557,8 @@ for _, entry in ipairs(component_plan) do
 			existing_component.texture = string.format("AscendantTiers/textures/icons/components/%s_t2.png", entry.id)
 			existing_component.production_recipe = apply_recipe_overrides(t2_id, build_t2_production_recipe(base_component))
 			local stat_changes = apply_primary_role_scaling(entry.id, base_component, existing_component)
-			existing_component.desc = upgraded_desc(base_component, base_name, stat_changes)
+			local fallback_desc = upgraded_desc(base_component, base_name, stat_changes)
+			existing_component.desc = resolve_t2_desc_override(t2_id, existing_component, fallback_desc)
 			apply_mining_speed_overrides(entry.id, t2_id)
 		end
 
