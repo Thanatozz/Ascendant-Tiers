@@ -1,5 +1,6 @@
 local ASCENDANT_TIERS_TECH_ID<const> = "tech_ascendant_tiers_start"
 local watcher_added = false
+local menu_retry_hooked = setmetatable({}, { __mode = "k" })
 
 local function get_local_faction()
 	if not Game.GetLocalPlayerFaction then
@@ -46,12 +47,32 @@ local function inject_pause_unlock_button(menu)
 	refresh_pause_unlock_state(menu)
 end
 
+local function ensure_pause_menu_hook(menu)
+	if not menu or menu_retry_hooked[menu] then
+		return
+	end
+	menu_retry_hooked[menu] = true
+
+	-- Retry on menu UI updates so we don't depend on simulation ticks when game is paused.
+	local previous_update = menu.update
+	menu.update = function(self, ...)
+		if previous_update then
+			previous_update(self, ...)
+		end
+
+		if not self.at_unlock_injected then
+			inject_pause_unlock_button(self)
+		end
+	end
+end
+
 local PauseMenuWatcher = {}
 UI.Register("AscendantTiersPauseMenuWatcher", "<Canvas/>", PauseMenuWatcher)
 
 function PauseMenuWatcher:update()
 	local menu = UI.FindWidget("InGameMenu")
 	if menu then
+		ensure_pause_menu_hook(menu)
 		inject_pause_unlock_button(menu)
 	end
 end
@@ -62,6 +83,13 @@ function UIMsg.OnSetup()
 	end
 	watcher_added = true
 	UI.AddLayout("AscendantTiersPauseMenuWatcher")
+
+	-- In case setup happens with menu already open.
+	local menu = UI.FindWidget("InGameMenu")
+	if menu then
+		ensure_pause_menu_hook(menu)
+		inject_pause_unlock_button(menu)
+	end
 end
 
 function FactionAction.UnlockAscendantTiersTech(faction)

@@ -15,13 +15,33 @@ local function scale_count(base_count, factor)
 	return scaled
 end
 
+local default_t2_material_map = {
+	metalplate = "ascendant_tiers_metal_plate",
+	reinforced_plate = "ascendant_tiers_reinforced_plate",
+	energized_plate = "ascendant_tiers_energized_plate",
+	hdframe = "ascendant_tiers_high_density_frame",
+	high_density_frame = "ascendant_tiers_high_density_frame",
+	circuit_board = "ascendant_tiers_circuit_board",
+	icchip = "ascendant_tiers_ic_chip",
+	ic_chip = "ascendant_tiers_ic_chip",
+}
+
+local t2_balance = data.ascendant_tiers_t2_balance or {}
+local building_balance = t2_balance.buildings or {}
+local t2_material_map = ((t2_balance.materials or {}).map) or default_t2_material_map
+
 local function socket_scale_factor(socket_type)
-	if socket_type == "Internal" then
-		return 1.5
+	local socket_scale = building_balance.socket_scale
+	if type(socket_scale) == "table" then
+		local scaled_by_type = socket_scale[socket_type]
+		if type(scaled_by_type) == "number" then
+			return scaled_by_type
+		end
+		if type(socket_scale.default) == "number" then
+			return socket_scale.default
+		end
 	end
-	if socket_type == "Small" or socket_type == "Medium" or socket_type == "Large" then
-		return 2.0
-	end
+
 	return 1.0
 end
 
@@ -63,17 +83,6 @@ local function round_up_to_10(value)
 	return math.max(10, math.ceil(value / 10) * 10)
 end
 
-local t2_material_map = {
-	metalplate = "ascendant_tiers_metal_plate",
-	reinforced_plate = "ascendant_tiers_reinforced_plate",
-	energized_plate = "ascendant_tiers_energized_plate",
-	hdframe = "ascendant_tiers_high_density_frame",
-	high_density_frame = "ascendant_tiers_high_density_frame",
-	circuit_board = "ascendant_tiers_circuit_board",
-	icchip = "ascendant_tiers_ic_chip",
-	ic_chip = "ascendant_tiers_ic_chip",
-}
-
 local texture_overrides = {
 	f_building1x1_4s_t2 = "AscendantTiers/textures/icons/frame/building_1x1_4s_t2.png",
 	f_building1x1_2s_t2 = "AscendantTiers/textures/icons/frame/building_1x1_2s_t2.png",
@@ -104,15 +113,15 @@ local building_plan = {
 	-- Stage 1 (Starter)
 	{ stage = 1, base_id = "f_building1x1c", t2_id = "f_building1x1_4s_t2", name = "Building 1x1 (4S) [T2]" },
 	{ stage = 1, base_id = "f_building1x1d", t2_id = "f_building1x1_2s_t2", name = "Building 1x1 (2S) [T2]" },
-	{ stage = 1, base_id = "f_building1x1f", t2_id = "f_storage16_t2", name = "Storage Block (16) [T2]", storage_mult = 2.0 },
-	{ stage = 2, base_id = "f_building1x1g", t2_id = "f_storage32_t2", name = "Storage Block (32) [T2]", storage_mult = 2.0 },
+	{ stage = 1, base_id = "f_building1x1f", t2_id = "f_storage16_t2", name = "Storage Block (16) [T2]" },
+	{ stage = 2, base_id = "f_building1x1g", t2_id = "f_storage32_t2", name = "Storage Block (32) [T2]" },
 	{ stage = 1, base_id = "f_building1x1h", t2_id = "f_building1x1_2m_defense_t2", name = "Defense Block (2M) [T2]" },
 	{ stage = 1, base_id = "f_building2x1f", t2_id = "f_building2x1_2m2s_t2", name = "Building 2x1 (2M2S) [T2]" },
 	{ stage = 1, base_id = "f_building2x1g", t2_id = "f_building2x1_2m_compact_t2", name = "Building 2x1 (2M) (Compact) [T2]" },
 
 	-- Stage 2 (Medium)
 	{ stage = 2, base_id = "f_building1x1a", t2_id = "f_building1x1_2m_t2", name = "Building 1x1 (2M) [T2]" },
-	{ stage = 3, base_id = "f_building1x1e", t2_id = "f_storage48_t2", name = "Storage Block (48) [T2]", storage_mult = 2.0 },
+	{ stage = 3, base_id = "f_building1x1e", t2_id = "f_storage48_t2", name = "Storage Block (48) [T2]" },
 	{ stage = 2, base_id = "f_building2x1a", t2_id = "f_building2x1_4m_basic_t2", name = "Building 2x1 (4M) (Basic) [T2]" },
 	{ stage = 2, base_id = "f_building2x1c", t2_id = "f_building2x1_4m_t2", name = "Building 2x1 (4M) [T2]" },
 	{ stage = 2, base_id = "f_building2x1e", t2_id = "f_building2x1_4s2m_t2", name = "Building 2x1 (4S2M) [T2]" },
@@ -161,13 +170,55 @@ local function apply_construction_recipe_overrides(t2_id, recipe)
 		return recipe
 	end
 
-	if t2_id == "f_building1x1_2s_t2" or t2_id == "f_storage16_t2" then
-		local metalbar_count = recipe.ingredients.metalbar
-		if type(metalbar_count) == "number" and metalbar_count > 0 then
-			recipe.ingredients.metalbar = nil
-			recipe.ingredients.ascendant_tiers_metal_plate =
-				(recipe.ingredients.ascendant_tiers_metal_plate or 0) + math.max(1, math.floor(metalbar_count / 2))
+	local overrides = building_balance.construction_overrides
+	local override = type(overrides) == "table" and overrides[t2_id]
+	if type(override) ~= "table" then
+		return recipe
+	end
+
+	if type(override.remove_ingredients) == "table" then
+		for _, ingredient_id in ipairs(override.remove_ingredients) do
+			recipe.ingredients[ingredient_id] = nil
 		end
+	end
+
+	local convert = override.convert_ingredient
+	if type(convert) == "table" and type(convert.from) == "string" and type(convert.to) == "string" then
+		local from_amount = recipe.ingredients[convert.from]
+		if type(from_amount) == "number" and from_amount > 0 then
+			recipe.ingredients[convert.from] = nil
+
+			local converted = from_amount
+			if type(convert.divisor) == "number" and convert.divisor > 0 then
+				converted = converted / convert.divisor
+			end
+			if type(convert.multiplier) == "number" then
+				converted = converted * convert.multiplier
+			end
+			if type(convert.minimum) == "number" then
+				converted = math.max(convert.minimum, converted)
+			end
+
+			local round_mode = convert.round or "floor"
+			if round_mode == "ceil" then
+				converted = math.ceil(converted)
+			elseif round_mode == "floor" then
+				converted = math.floor(converted)
+			elseif round_mode == "round" then
+				converted = math.floor(converted + 0.5)
+			end
+
+			if convert.mode == "set" then
+				recipe.ingredients[convert.to] = converted
+			else
+				recipe.ingredients[convert.to] = (recipe.ingredients[convert.to] or 0) + converted
+			end
+		end
+	end
+
+	local set_ingredient = override.set_ingredient
+	if type(set_ingredient) == "table" and type(set_ingredient.item) == "string" and type(set_ingredient.amount) == "number" then
+		recipe.ingredients[set_ingredient.item] = set_ingredient.amount
 	end
 
 	return recipe
@@ -231,6 +282,36 @@ local function resolve_unlock_stage(entry, frame_def)
 	return entry.stage
 end
 
+local function resolve_health_multiplier(entry)
+	if type(entry.health_mult) == "number" then
+		return entry.health_mult
+	end
+
+	local overrides = building_balance.health_multiplier_overrides
+	if type(overrides) == "table" and type(overrides[entry.t2_id]) == "number" then
+		return overrides[entry.t2_id]
+	end
+
+	if type(building_balance.health_multiplier_default) == "number" then
+		return building_balance.health_multiplier_default
+	end
+
+	return 1.35
+end
+
+local function resolve_storage_multiplier(entry)
+	if type(entry.storage_mult) == "number" then
+		return entry.storage_mult
+	end
+
+	local overrides = building_balance.storage_multiplier_overrides
+	if type(overrides) == "table" and type(overrides[entry.t2_id]) == "number" then
+		return overrides[entry.t2_id]
+	end
+
+	return nil
+end
+
 local stage_unlocks = { [1] = {}, [2] = {}, [3] = {}, [4] = {} }
 local next_index = 9300
 
@@ -248,15 +329,16 @@ for _, entry in ipairs(building_plan) do
 			apply_construction_recipe_overrides(entry.t2_id, build_t2_construction_recipe(base_frame) or base_frame.construction_recipe)
 
 		if type(base_frame.health_points) == "number" and base_frame.health_points > 0 then
-			frame_def.health_points = math.ceil(base_frame.health_points * (entry.health_mult or 1.35))
+			frame_def.health_points = math.ceil(base_frame.health_points * resolve_health_multiplier(entry))
 		end
 
 		if type(base_frame.component_boost) == "number" and base_frame.component_boost > 0 then
 			frame_def.component_boost = round_up_to_10(entry.component_boost or base_frame.component_boost)
 		end
 
-		if type(frame_def.slots) == "table" and type(frame_def.slots.storage) == "number" and entry.storage_mult then
-			frame_def.slots.storage = math.max(1, math.ceil(frame_def.slots.storage * entry.storage_mult))
+		local storage_multiplier = resolve_storage_multiplier(entry)
+		if type(frame_def.slots) == "table" and type(frame_def.slots.storage) == "number" and type(storage_multiplier) == "number" then
+			frame_def.slots.storage = math.max(1, math.ceil(frame_def.slots.storage * storage_multiplier))
 			frame_def.desc = resolve_t2_desc_override(entry.t2_id, frame_def, frame_def.desc)
 		end
 

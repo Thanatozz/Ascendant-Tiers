@@ -7,7 +7,7 @@ local function clone_table(value)
 	return copy
 end
 
-local t2_material_map = {
+local default_t2_material_map = {
 	metalplate = "ascendant_tiers_metal_plate",
 	reinforced_plate = "ascendant_tiers_reinforced_plate",
 	energized_plate = "ascendant_tiers_energized_plate",
@@ -17,6 +17,13 @@ local t2_material_map = {
 	icchip = "ascendant_tiers_ic_chip",
 	ic_chip = "ascendant_tiers_ic_chip",
 }
+
+local t2_balance = data.ascendant_tiers_t2_balance or {}
+local t2_material_map = ((t2_balance.materials or {}).map) or default_t2_material_map
+local component_balance = t2_balance.components or {}
+local component_recipe_balance = component_balance.recipe or {}
+local component_mining_balance = component_balance.mining or {}
+local component_stat_balance = component_balance.stats or {}
 
 local function map_to_t2_material_if_available(item_id)
 	return t2_material_map[item_id] or item_id
@@ -88,6 +95,12 @@ local battery_components = as_set({
 	"c_power_core",
 })
 
+local storage_components = as_set({
+	"c_small_storage",
+	"c_medium_storage",
+	"c_large_storage",
+})
+
 local power_field_components = as_set({
 	"c_portable_relay",
 	"c_small_relay",
@@ -107,12 +120,14 @@ local function build_t2_production_recipe(base_component)
 		return base_recipe
 	end
 
+	local base_ingredient_multiplier = tonumber(component_recipe_balance.base_ingredient_multiplier) or 2.0
+
 	local ingredients = {}
 	for item_id, amount in pairs(base_recipe.ingredients) do
 		if is_component_id(item_id) then
 			add_amount(ingredients, to_t2_component_id(item_id), amount)
 		else
-			add_amount(ingredients, map_to_t2_material_if_available(item_id), amount * 2)
+			add_amount(ingredients, map_to_t2_material_if_available(item_id), amount * base_ingredient_multiplier)
 		end
 	end
 
@@ -131,19 +146,66 @@ local function apply_recipe_overrides(component_id, recipe)
 		return recipe
 	end
 
-	if component_id == "c_miner_t2" then
-		local metalbar_count = recipe.ingredients.metalbar
-		if type(metalbar_count) == "number" and metalbar_count > 0 then
-			recipe.ingredients.metalbar = nil
-			recipe.ingredients.ascendant_tiers_metal_plate =
-				(recipe.ingredients.ascendant_tiers_metal_plate or 0) + metalbar_count
+	local recipe_overrides = component_recipe_balance.overrides
+	local override = type(recipe_overrides) == "table" and recipe_overrides[component_id]
+	if type(override) ~= "table" then
+		return recipe
+	end
+
+	if type(override.remove_ingredients) == "table" then
+		for _, ingredient_id in ipairs(override.remove_ingredients) do
+			recipe.ingredients[ingredient_id] = nil
 		end
-	elseif component_id == "c_portable_relay_t2" then
-		recipe.ingredients.metalbar = nil
-		recipe.ingredients.ascendant_tiers_metal_plate = 5
+	end
+
+	local convert = override.convert_ingredient
+	if type(convert) == "table" and type(convert.from) == "string" and type(convert.to) == "string" then
+		local from_amount = recipe.ingredients[convert.from]
+		if type(from_amount) == "number" and from_amount > 0 then
+			recipe.ingredients[convert.from] = nil
+
+			local converted = from_amount
+			if type(convert.divisor) == "number" and convert.divisor > 0 then
+				converted = converted / convert.divisor
+			end
+			if type(convert.multiplier) == "number" then
+				converted = converted * convert.multiplier
+			end
+			if type(convert.minimum) == "number" then
+				converted = math.max(convert.minimum, converted)
+			end
+
+			local round_mode = convert.round
+			if round_mode == "ceil" then
+				converted = math.ceil(converted)
+			elseif round_mode == "floor" then
+				converted = math.floor(converted)
+			elseif round_mode == "round" then
+				converted = math.floor(converted + 0.5)
+			end
+
+			if convert.mode == "set" then
+				recipe.ingredients[convert.to] = converted
+			else
+				recipe.ingredients[convert.to] = (recipe.ingredients[convert.to] or 0) + converted
+			end
+		end
+	end
+
+	local set_ingredient = override.set_ingredient
+	if type(set_ingredient) == "table" and type(set_ingredient.item) == "string" and type(set_ingredient.amount) == "number" then
+		recipe.ingredients[set_ingredient.item] = set_ingredient.amount
 	end
 
 	return recipe
+end
+
+local function component_stat_multiplier(field, fallback)
+	local multiplier = component_stat_balance[field]
+	if type(multiplier) == "number" then
+		return multiplier
+	end
+	return fallback
 end
 
 local function scaled_number(base_component, field, factor, positive_only)
@@ -159,9 +221,12 @@ end
 
 local field_desc_keywords = {
 	repair = { "repair", "repairs", "heal", "heals" },
+	trigger_radius = { "range", "radius", "repair" },
 	shield_max = { "shield", "shields" },
 	damage = { "damage", "damages" },
 	dotdps = { "dps", "dot", "burn" },
+	storage_slots = { "storage", "slot", "slots", "capacity" },
+	bandwidth = { "bandwidth", "transmit", "power", "transfer" },
 	power = { "power", "energy" },
 	drain_rate = { "drain", "consumes", "consumption", "upkeep" },
 	max_power = { "power", "energy" },
@@ -295,15 +360,26 @@ local function apply_primary_role_scaling(base_component_id, base_component, com
 	local stat_changes = {}
 
 	if healer_components[base_component_id] then
-		local scaled_repair = scaled_number(base_component, "repair", 2)
+		local scaled_repair = scaled_number(base_component, "repair", component_stat_multiplier("repair", 2))
 		if scaled_repair then
 			component_def.repair = scaled_repair
 			collect_stat_change(base_component, "repair", scaled_repair, stat_changes)
 		end
+
+		local scaled_trigger_radius = scaled_number(
+			base_component,
+			"trigger_radius",
+			component_stat_multiplier("trigger_radius", 2),
+			true
+		)
+		if scaled_trigger_radius then
+			component_def.trigger_radius = scaled_trigger_radius
+			collect_stat_change(base_component, "trigger_radius", scaled_trigger_radius, stat_changes)
+		end
 	end
 
 	if shield_components[base_component_id] then
-		local scaled_shield = scaled_number(base_component, "shield_max", 2)
+		local scaled_shield = scaled_number(base_component, "shield_max", component_stat_multiplier("shield_max", 2))
 		if scaled_shield then
 			component_def.shield_max = scaled_shield
 			collect_stat_change(base_component, "shield_max", scaled_shield, stat_changes)
@@ -311,13 +387,13 @@ local function apply_primary_role_scaling(base_component_id, base_component, com
 	end
 
 	if damage_components[base_component_id] then
-		local scaled_damage = scaled_number(base_component, "damage", 2)
+		local scaled_damage = scaled_number(base_component, "damage", component_stat_multiplier("damage", 2))
 		if scaled_damage then
 			component_def.damage = scaled_damage
 			collect_stat_change(base_component, "damage", scaled_damage, stat_changes)
 		end
 
-		local scaled_dot = scaled_number(base_component, "dotdps", 2)
+		local scaled_dot = scaled_number(base_component, "dotdps", component_stat_multiplier("dotdps", 2))
 		if scaled_dot then
 			component_def.dotdps = scaled_dot
 			collect_stat_change(base_component, "dotdps", scaled_dot, stat_changes)
@@ -325,25 +401,35 @@ local function apply_primary_role_scaling(base_component_id, base_component, com
 	end
 
 	if energy_generation_components[base_component_id] then
-		local scaled_power = scaled_number(base_component, "power", 2, true)
+		local scaled_power = scaled_number(base_component, "power", component_stat_multiplier("power", 2), true)
 		if scaled_power then
 			component_def.power = scaled_power
 			collect_stat_change(base_component, "power", scaled_power, stat_changes)
 		end
 
-		local scaled_wind = scaled_number(base_component, "max_power", 2, true)
+		local scaled_wind = scaled_number(base_component, "max_power", component_stat_multiplier("max_power", 2), true)
 		if scaled_wind then
 			component_def.max_power = scaled_wind
 			collect_stat_change(base_component, "max_power", scaled_wind, stat_changes)
 		end
 
-		local scaled_solar_day = scaled_number(base_component, "solar_power_generated", 2, true)
+		local scaled_solar_day = scaled_number(
+			base_component,
+			"solar_power_generated",
+			component_stat_multiplier("solar_power_generated", 2),
+			true
+		)
 		if scaled_solar_day then
 			component_def.solar_power_generated = scaled_solar_day
 			collect_stat_change(base_component, "solar_power_generated", scaled_solar_day, stat_changes)
 		end
 
-		local scaled_solar_summer = scaled_number(base_component, "solar_power_summer", 2, true)
+		local scaled_solar_summer = scaled_number(
+			base_component,
+			"solar_power_summer",
+			component_stat_multiplier("solar_power_summer", 2),
+			true
+		)
 		if scaled_solar_summer then
 			component_def.solar_power_summer = scaled_solar_summer
 			collect_stat_change(base_component, "solar_power_summer", scaled_solar_summer, stat_changes)
@@ -351,33 +437,74 @@ local function apply_primary_role_scaling(base_component_id, base_component, com
 	end
 
 	if battery_components[base_component_id] then
-		local scaled_storage = scaled_number(base_component, "power_storage", 2, true)
+		local scaled_storage = scaled_number(
+			base_component,
+			"power_storage",
+			component_stat_multiplier("power_storage", 2),
+			true
+		)
 		if scaled_storage then
 			component_def.power_storage = scaled_storage
 			collect_stat_change(base_component, "power_storage", scaled_storage, stat_changes)
 		end
 
-		local scaled_capacity = scaled_number(base_component, "power_capacity", 2, true)
+		local scaled_capacity = scaled_number(
+			base_component,
+			"power_capacity",
+			component_stat_multiplier("power_capacity", 2),
+			true
+		)
 		if scaled_capacity then
 			component_def.power_capacity = scaled_capacity
 			collect_stat_change(base_component, "power_capacity", scaled_capacity, stat_changes)
 		end
 	end
 
+	if storage_components[base_component_id] then
+		local slots = base_component.slots
+		local base_storage_slots = type(slots) == "table" and slots.storage
+		if type(base_storage_slots) == "number" and base_storage_slots > 0 then
+			local scaled_storage_slots = base_storage_slots * component_stat_multiplier("storage_slots", 2)
+			component_def.slots = clone_table(slots)
+			component_def.slots.storage = scaled_storage_slots
+			table.insert(stat_changes, {
+				field = "storage_slots",
+				old_value = base_storage_slots,
+				new_value = scaled_storage_slots,
+				keywords = field_desc_keywords.storage_slots or {},
+			})
+		end
+	end
+
 	if base_component_id == "c_crystal_power" then
-		local scaled_drain = scaled_number(base_component, "drain_rate", 2, true)
+		local scaled_drain = scaled_number(
+			base_component,
+			"drain_rate",
+			component_stat_multiplier("drain_rate", 2),
+			true
+		)
 		if scaled_drain then
 			component_def.drain_rate = scaled_drain
 			collect_stat_change(base_component, "drain_rate", scaled_drain, stat_changes)
 		end
 
-		local scaled_storage = scaled_number(base_component, "power_storage", 2, true)
+		local scaled_storage = scaled_number(
+			base_component,
+			"power_storage",
+			component_stat_multiplier("power_storage", 2),
+			true
+		)
 		if scaled_storage then
 			component_def.power_storage = scaled_storage
 			collect_stat_change(base_component, "power_storage", scaled_storage, stat_changes)
 		end
 
-		local scaled_capacity = scaled_number(base_component, "power_capacity", 2, true)
+		local scaled_capacity = scaled_number(
+			base_component,
+			"power_capacity",
+			component_stat_multiplier("power_capacity", 2),
+			true
+		)
 		if scaled_capacity then
 			component_def.power_capacity = scaled_capacity
 			collect_stat_change(base_component, "power_capacity", scaled_capacity, stat_changes)
@@ -385,7 +512,7 @@ local function apply_primary_role_scaling(base_component_id, base_component, com
 
 		local base_power = base_component.power
 		if type(base_power) == "number" and base_power < 0 then
-			local scaled_negative_power = base_power * 2
+			local scaled_negative_power = base_power * component_stat_multiplier("power", 2)
 			component_def.power = scaled_negative_power
 			collect_stat_change(base_component, "power", scaled_negative_power, stat_changes)
 		end
@@ -394,11 +521,17 @@ local function apply_primary_role_scaling(base_component_id, base_component, com
 	if power_field_components[base_component_id] then
 		local range_fields = { "transfer_radius", "range", "power_range", "relay_range", "field_radius", "radius" }
 		for _, field in ipairs(range_fields) do
-			local scaled_range = scaled_number(base_component, field, 2, true)
+			local scaled_range = scaled_number(base_component, field, component_stat_multiplier(field, 2), true)
 			if scaled_range then
 				component_def[field] = scaled_range
 				collect_stat_change(base_component, field, scaled_range, stat_changes)
 			end
+		end
+
+		local scaled_bandwidth = scaled_number(base_component, "bandwidth", component_stat_multiplier("bandwidth", 2), true)
+		if scaled_bandwidth then
+			component_def.bandwidth = scaled_bandwidth
+			collect_stat_change(base_component, "bandwidth", scaled_bandwidth, stat_changes)
 		end
 	end
 
@@ -410,11 +543,18 @@ local function apply_mining_speed_overrides(base_component_id, t2_component_id)
 		return
 	end
 
+	local ticks_divisor = tonumber(component_mining_balance.ticks_divisor) or 2.0
+	local min_ticks = tonumber(component_mining_balance.min_ticks) or 1
+
 	for _, item_def in pairs(data.items) do
 		local mining_recipe = item_def and item_def.mining_recipe
 		local base_ticks = type(mining_recipe) == "table" and mining_recipe[base_component_id]
 		if type(base_ticks) == "number" and base_ticks > 0 then
-			mining_recipe[t2_component_id] = math.max(1, math.floor(base_ticks / 2))
+			local scaled_ticks = base_ticks
+			if ticks_divisor > 0 then
+				scaled_ticks = scaled_ticks / ticks_divisor
+			end
+			mining_recipe[t2_component_id] = math.max(min_ticks, math.floor(scaled_ticks))
 		end
 	end
 end
@@ -424,7 +564,7 @@ local function upgraded_desc(base_component, base_name, stat_changes)
 	local desc_body = replace_stat_values_in_desc(original_desc, stat_changes or {})
 	if desc_body == "" then
 		desc_body = string.format(
-			"%s variant with 2x efficiency in its primary function (role-focused, not 2x every stat).",
+			"%s variant with increased efficiency in its primary function (role-focused, not flat scaling).",
 			base_name
 		)
 	end

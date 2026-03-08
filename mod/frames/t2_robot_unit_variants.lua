@@ -15,12 +15,31 @@ local function scale_count(base_count, factor)
 	return scaled
 end
 
+local default_t2_material_map = {
+	metalplate = "ascendant_tiers_metal_plate",
+	reinforced_plate = "ascendant_tiers_reinforced_plate",
+	energized_plate = "ascendant_tiers_energized_plate",
+	hdframe = "ascendant_tiers_high_density_frame",
+	high_density_frame = "ascendant_tiers_high_density_frame",
+	circuit_board = "ascendant_tiers_circuit_board",
+	icchip = "ascendant_tiers_ic_chip",
+	ic_chip = "ascendant_tiers_ic_chip",
+}
+
+local t2_balance = data.ascendant_tiers_t2_balance or {}
+local unit_balance = t2_balance.units or {}
+local t2_material_map = ((t2_balance.materials or {}).map) or default_t2_material_map
+
 local function socket_scale_factor(socket_type)
-	if socket_type == "Internal" then
-		return 1.5
-	end
-	if socket_type == "Small" or socket_type == "Medium" or socket_type == "Large" then
-		return 2.0
+	local socket_scale = unit_balance.socket_scale
+	if type(socket_scale) == "table" then
+		local scaled_by_type = socket_scale[socket_type]
+		if type(scaled_by_type) == "number" then
+			return scaled_by_type
+		end
+		if type(socket_scale.default) == "number" then
+			return socket_scale.default
+		end
 	end
 	return 1.0
 end
@@ -84,17 +103,6 @@ end
 local function add_amount(target, item_id, amount)
 	target[item_id] = (target[item_id] or 0) + amount
 end
-
-local t2_material_map = {
-	metalplate = "ascendant_tiers_metal_plate",
-	reinforced_plate = "ascendant_tiers_reinforced_plate",
-	energized_plate = "ascendant_tiers_energized_plate",
-	hdframe = "ascendant_tiers_high_density_frame",
-	high_density_frame = "ascendant_tiers_high_density_frame",
-	circuit_board = "ascendant_tiers_circuit_board",
-	icchip = "ascendant_tiers_ic_chip",
-	ic_chip = "ascendant_tiers_ic_chip",
-}
 
 local function map_to_t2_if_available(item_id)
 	local mapped = t2_material_map[item_id]
@@ -175,6 +183,27 @@ local unit_plan = {
 	{ id = "f_bot_2m_as", stage = 3 },
 }
 
+local function resolve_unit_health_multiplier()
+	if type(unit_balance.health_multiplier) == "number" then
+		return unit_balance.health_multiplier
+	end
+	return 1.25
+end
+
+local function resolve_no_sml_inventory_multiplier()
+	if type(unit_balance.no_sml_inventory_multiplier) == "number" then
+		return unit_balance.no_sml_inventory_multiplier
+	end
+	return 2.0
+end
+
+local function resolve_no_sml_speed_multiplier()
+	if type(unit_balance.no_sml_speed_multiplier) == "number" then
+		return unit_balance.no_sml_speed_multiplier
+	end
+	return 1.5
+end
+
 local stage_unlocks = { [1] = {}, [2] = {}, [3] = {} }
 local next_index = 9400
 
@@ -194,7 +223,7 @@ for _, entry in ipairs(unit_plan) do
 			frame_def.slots = clone_table(base_frame.slots)
 
 			if type(base_frame.health_points) == "number" and base_frame.health_points > 0 then
-				frame_def.health_points = math.ceil(base_frame.health_points * 1.25)
+				frame_def.health_points = math.ceil(base_frame.health_points * resolve_unit_health_multiplier())
 			end
 
 			local base_visual = data.visuals[base_frame.visual]
@@ -209,10 +238,10 @@ for _, entry in ipairs(unit_plan) do
 				frame_def.visual = visual_id
 			end
 
-			-- Units without S/M/L sockets get 2x inventory as requested.
+			-- Units without S/M/L sockets use balance-config scaling for inventory/speed.
 			if not unit_has_sml_sockets then
-				scale_inventory_slots(frame_def.slots, 2.0)
-				scale_movement_speed(frame_def, 1.5)
+				scale_inventory_slots(frame_def.slots, resolve_no_sml_inventory_multiplier())
+				scale_movement_speed(frame_def, resolve_no_sml_speed_multiplier())
 				frame_def.desc = resolve_t2_desc_override(t2_id, frame_def, frame_def.desc)
 			end
 

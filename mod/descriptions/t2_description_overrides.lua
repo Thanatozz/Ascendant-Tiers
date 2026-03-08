@@ -171,6 +171,28 @@ local function storage_slots(frame_def)
 	return 0
 end
 
+local function component_storage_slots(component_def)
+	if type(component_def) ~= "table" or type(component_def.slots) ~= "table" then
+		return 0
+	end
+	local value = component_def.slots.storage
+	if type(value) == "number" and value > 0 then
+		return value
+	end
+	return 0
+end
+
+local function wind_base_output_raw(component)
+	local base_output = first_field(component, { "power" })
+	if base_output <= 0 then
+		local peak_output = first_field(component, { "max_power" })
+		if peak_output > 0 then
+			base_output = peak_output / 2
+		end
+	end
+	return base_output
+end
+
 local function battery_desc(component, label)
 	local capacity = battery_capacity(component)
 	if capacity > 0 then
@@ -221,8 +243,13 @@ local desc_overrides = {
 	end,
 
 	c_wind_turbine_t2 = function(component)
-		local base_output = effective_power_per_second(first_field(component, { "power" }))
-		local peak_output = effective_power_per_second(first_field(component, { "max_power" }))
+		local base_output_raw = wind_base_output_raw(component)
+		local peak_output_raw = first_field(component, { "max_power" })
+		if peak_output_raw <= 0 then
+			peak_output_raw = base_output_raw
+		end
+		local base_output = effective_power_per_second(base_output_raw)
+		local peak_output = effective_power_per_second(peak_output_raw * 2)
 		if peak_output > 0 then
 			return string.format(
 				"<hl>[T2]</> Wind turbine that generates up to <hl>%s</> power (base output <hl>%s</>) depending on wind conditions.",
@@ -237,8 +264,13 @@ local desc_overrides = {
 	end,
 
 	c_wind_turbine_l_t2 = function(component)
-		local base_output = effective_power_per_second(first_field(component, { "power" }))
-		local peak_output = effective_power_per_second(first_field(component, { "max_power" }))
+		local base_output_raw = wind_base_output_raw(component)
+		local peak_output_raw = first_field(component, { "max_power" })
+		if peak_output_raw <= 0 then
+			peak_output_raw = base_output_raw
+		end
+		local base_output = effective_power_per_second(base_output_raw)
+		local peak_output = effective_power_per_second(peak_output_raw * 2)
 		if peak_output > 0 then
 			return string.format(
 				"<hl>[T2]</> Large wind turbine with base output <hl>%s</> and peak output <hl>%s</> power.",
@@ -342,6 +374,30 @@ local desc_overrides = {
 
 	c_large_power_transmitter_t2 = function(component)
 		return relay_desc(component, "Large power transmitter")
+	end,
+
+	c_small_storage_t2 = function(component)
+		local slots = component_storage_slots(component)
+		if slots > 0 then
+			return string.format("<hl>[T2]</> Expands storage of Frame by <hl>%s slots</>.", format_number(slots))
+		end
+		return "<hl>[T2]</> Expands storage of Frame with additional slots."
+	end,
+
+	c_medium_storage_t2 = function(component)
+		local slots = component_storage_slots(component)
+		if slots > 0 then
+			return string.format("<hl>[T2]</> Expands storage of Frame by <hl>%s slots</>.", format_number(slots))
+		end
+		return "<hl>[T2]</> Expands storage of Frame with additional slots."
+	end,
+
+	c_large_storage_t2 = function(component)
+		local slots = component_storage_slots(component)
+		if slots > 0 then
+			return string.format("<hl>[T2]</> A larger storage component with <hl>%s slots</>.", format_number(slots))
+		end
+		return "<hl>[T2]</> A larger storage component with expanded capacity."
 	end,
 
 	f_storage16_t2 = function(frame_def)
