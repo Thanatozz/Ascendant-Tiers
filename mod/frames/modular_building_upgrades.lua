@@ -312,6 +312,19 @@ local function resolve_storage_multiplier(entry)
 	return nil
 end
 
+local function resolve_storage_slot_bonus(entry)
+	if type(entry.storage_slot_bonus) == "number" then
+		return entry.storage_slot_bonus
+	end
+
+	local overrides = building_balance.storage_slot_bonus_overrides
+	if type(overrides) == "table" and type(overrides[entry.t2_id]) == "number" then
+		return overrides[entry.t2_id]
+	end
+
+	return 0
+end
+
 local stage_unlocks = { [1] = {}, [2] = {}, [3] = {}, [4] = {} }
 local next_index = 9300
 
@@ -339,6 +352,12 @@ for _, entry in ipairs(building_plan) do
 		local storage_multiplier = resolve_storage_multiplier(entry)
 		if type(frame_def.slots) == "table" and type(frame_def.slots.storage) == "number" and type(storage_multiplier) == "number" then
 			frame_def.slots.storage = math.max(1, math.ceil(frame_def.slots.storage * storage_multiplier))
+			frame_def.desc = resolve_t2_desc_override(entry.t2_id, frame_def, frame_def.desc)
+		end
+
+		local storage_slot_bonus = resolve_storage_slot_bonus(entry)
+		if type(frame_def.slots) == "table" and type(frame_def.slots.storage) == "number" and storage_slot_bonus ~= 0 then
+			frame_def.slots.storage = math.max(1, frame_def.slots.storage + math.floor(storage_slot_bonus + 0.5))
 			frame_def.desc = resolve_t2_desc_override(entry.t2_id, frame_def, frame_def.desc)
 		end
 

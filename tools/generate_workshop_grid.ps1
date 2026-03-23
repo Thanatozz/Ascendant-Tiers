@@ -152,26 +152,20 @@ try {
     }
 
     $headerFont = New-Object System.Drawing.Font("Segoe UI Black", 64, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
-    $subFont = New-Object System.Drawing.Font("Segoe UI", 30, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
     $headerBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(245, 245, 245))
-    $accentBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 198, 90))
     try {
         $fmt = New-Object System.Drawing.StringFormat
         $fmt.Alignment = [System.Drawing.StringAlignment]::Center
         $fmt.LineAlignment = [System.Drawing.StringAlignment]::Center
 
-        $headerRect = New-Object System.Drawing.RectangleF -ArgumentList @([single]0, [single]14, [single]$Width, [single]78)
-        $subRect = New-Object System.Drawing.RectangleF -ArgumentList @([single]0, [single]88, [single]$Width, [single]48)
+        $headerRect = New-Object System.Drawing.RectangleF -ArgumentList @([single]0, [single]20, [single]$Width, [single]78)
         $graphics.DrawString("Ascendant Tiers", $headerFont, $headerBrush, $headerRect, $fmt)
-        $graphics.DrawString("Random T2 Grid: Components / Units / Buildings", $subFont, $accentBrush, $subRect, $fmt)
 
         $fmt.Dispose()
     }
     finally {
         $headerFont.Dispose()
-        $subFont.Dispose()
         $headerBrush.Dispose()
-        $accentBrush.Dispose()
     }
 
     $outerMargin = 32
@@ -184,9 +178,9 @@ try {
     $panel2 = New-Object System.Drawing.RectangleF -ArgumentList @([single]($outerMargin + $panelWidth + $panelGap), [single]$panelTop, [single]$panelWidth, [single]$panelHeight)
     $panel3 = New-Object System.Drawing.RectangleF -ArgumentList @([single]($outerMargin + (2 * ($panelWidth + $panelGap))), [single]$panelTop, [single]$panelWidth, [single]$panelHeight)
 
-    Draw-CategoryGrid -Graphics $graphics -PanelRect $panel1 -Title "Components T2" -Files $componentsRandom -PanelColor ([System.Drawing.Color]::FromArgb(96, 29, 58, 96))
-    Draw-CategoryGrid -Graphics $graphics -PanelRect $panel2 -Title "Units T2" -Files $unitsRandom -PanelColor ([System.Drawing.Color]::FromArgb(96, 44, 79, 59))
-    Draw-CategoryGrid -Graphics $graphics -PanelRect $panel3 -Title "Buildings T2" -Files $buildingsRandom -PanelColor ([System.Drawing.Color]::FromArgb(96, 84, 64, 34))
+    Draw-CategoryGrid -Graphics $graphics -PanelRect $panel1 -Title "Components II" -Files $componentsRandom -PanelColor ([System.Drawing.Color]::FromArgb(96, 29, 58, 96))
+    Draw-CategoryGrid -Graphics $graphics -PanelRect $panel2 -Title "Units II" -Files $unitsRandom -PanelColor ([System.Drawing.Color]::FromArgb(96, 44, 79, 59))
+    Draw-CategoryGrid -Graphics $graphics -PanelRect $panel3 -Title "Buildings II" -Files $buildingsRandom -PanelColor ([System.Drawing.Color]::FromArgb(96, 84, 64, 34))
 
     $borderPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(220, 255, 204, 120), 4)
     try {

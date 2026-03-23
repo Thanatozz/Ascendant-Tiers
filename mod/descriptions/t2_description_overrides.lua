@@ -182,15 +182,23 @@ local function component_storage_slots(component_def)
 	return 0
 end
 
-local function wind_base_output_raw(component)
+local function wind_outputs_raw(component)
 	local base_output = first_field(component, { "power" })
-	if base_output <= 0 then
-		local peak_output = first_field(component, { "max_power" })
-		if peak_output > 0 then
-			base_output = peak_output / 2
-		end
+	local peak_output = first_field(component, { "max_power" })
+
+	if base_output <= 0 and peak_output > 0 then
+		base_output = peak_output / 2
 	end
-	return base_output
+
+	if peak_output <= 0 and base_output > 0 then
+		peak_output = base_output * 2
+	end
+
+	if peak_output <= 0 then
+		peak_output = base_output
+	end
+
+	return base_output, peak_output
 end
 
 local function battery_desc(component, label)
@@ -243,18 +251,14 @@ local desc_overrides = {
 	end,
 
 	c_wind_turbine_t2 = function(component)
-		local base_output_raw = wind_base_output_raw(component)
-		local peak_output_raw = first_field(component, { "max_power" })
-		if peak_output_raw <= 0 then
-			peak_output_raw = base_output_raw
-		end
+		local base_output_raw, peak_output_raw = wind_outputs_raw(component)
 		local base_output = effective_power_per_second(base_output_raw)
-		local peak_output = effective_power_per_second(peak_output_raw * 2)
-		if peak_output > 0 then
+		local peak_output = effective_power_per_second(peak_output_raw)
+		if base_output > 0 and peak_output > 0 then
 			return string.format(
-				"<hl>[T2]</> Wind turbine that generates up to <hl>%s</> power (base output <hl>%s</>) depending on wind conditions.",
-				format_number(peak_output),
-				format_number(base_output)
+				"<hl>[T2]</> Constant <hl>%s</> power generation per second, <hl>%s</> when located on the plateau.",
+				format_number(base_output),
+				format_number(peak_output)
 			)
 		end
 		return string.format(
@@ -264,16 +268,12 @@ local desc_overrides = {
 	end,
 
 	c_wind_turbine_l_t2 = function(component)
-		local base_output_raw = wind_base_output_raw(component)
-		local peak_output_raw = first_field(component, { "max_power" })
-		if peak_output_raw <= 0 then
-			peak_output_raw = base_output_raw
-		end
+		local base_output_raw, peak_output_raw = wind_outputs_raw(component)
 		local base_output = effective_power_per_second(base_output_raw)
-		local peak_output = effective_power_per_second(peak_output_raw * 2)
-		if peak_output > 0 then
+		local peak_output = effective_power_per_second(peak_output_raw)
+		if base_output > 0 and peak_output > 0 then
 			return string.format(
-				"<hl>[T2]</> Large wind turbine with base output <hl>%s</> and peak output <hl>%s</> power.",
+				"<hl>[T2]</> Large wind turbine with constant <hl>%s</> power generation per second, <hl>%s</> when located on the plateau.",
 				format_number(base_output),
 				format_number(peak_output)
 			)

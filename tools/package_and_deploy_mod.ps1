@@ -1,12 +1,24 @@
 param(
     [string]$ModFolder = (Join-Path (Join-Path $PSScriptRoot "..") "mod"),
-    [string]$ZipName = "AscendedTiers.zip",
+    [string]$ZipName = "AscendantTiers.zip",
     [string]$DeployPath = "C:\Program Files (x86)\Steam\steamapps\common\Desynced\Desynced\Content\mods"
 )
 
 $ErrorActionPreference = "Stop"
+$exitCode = 0
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+function Wait-ForAnyKey {
+    Write-Host ""
+    Write-Host "Presiona cualquier tecla para cerrar..."
+    try {
+        $null = [Console]::ReadKey($true)
+    }
+    catch {
+        Read-Host "No se pudo capturar tecla. Presiona Enter para cerrar"
+    }
+}
 
 function New-ZipWithNormalizedPaths {
     param(
@@ -84,5 +96,9 @@ try {
 }
 catch {
     Write-Error ("[ERROR] " + $_.Exception.Message)
-    exit 1
+    $exitCode = 1
+}
+finally {
+    Wait-ForAnyKey
+    exit $exitCode
 }

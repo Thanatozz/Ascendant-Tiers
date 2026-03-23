@@ -30,8 +30,6 @@ function Draw-CategoryPage {
         [Parameter(Mandatory = $true)]
         [string]$Title,
         [Parameter(Mandatory = $true)]
-        [string]$Subtitle,
-        [Parameter(Mandatory = $true)]
         [System.IO.FileInfo[]]$PageFiles,
         [Parameter(Mandatory = $true)]
         [int]$Cols,
@@ -68,27 +66,21 @@ function Draw-CategoryPage {
         }
 
         $titleFont = New-Object System.Drawing.Font("Segoe UI Black", 58, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
-        $subFont = New-Object System.Drawing.Font("Segoe UI", 27, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
         $titleBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(245, 245, 245))
-        $subBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 198, 90))
 
         try {
             $fmt = New-Object System.Drawing.StringFormat
             $fmt.Alignment = [System.Drawing.StringAlignment]::Center
             $fmt.LineAlignment = [System.Drawing.StringAlignment]::Center
 
-            $titleRect = New-Object System.Drawing.RectangleF -ArgumentList @([single]0, [single]12, [single]$CanvasWidth, [single]78)
-            $subRect = New-Object System.Drawing.RectangleF -ArgumentList @([single]0, [single]88, [single]$CanvasWidth, [single]48)
+            $titleRect = New-Object System.Drawing.RectangleF -ArgumentList @([single]0, [single]20, [single]$CanvasWidth, [single]78)
             $graphics.DrawString($Title, $titleFont, $titleBrush, $titleRect, $fmt)
-            $graphics.DrawString($Subtitle, $subFont, $subBrush, $subRect, $fmt)
 
             $fmt.Dispose()
         }
         finally {
             $titleFont.Dispose()
-            $subFont.Dispose()
             $titleBrush.Dispose()
-            $subBrush.Dispose()
         }
 
         $outerMargin = 40
@@ -195,8 +187,7 @@ Get-ChildItem -LiteralPath $OutputDir -Filter "workshop_components_t2*.png" -Fil
 $categories = @(
     @{
         Key = "buildings"
-        Title = "Ascendant Tiers - Buildings [T2]"
-        Subtitle = "All T2 building frames"
+        Title = "Ascendant Tiers - Buildings [II]"
         Files = $buildings
         Cols = 6
         Rows = 4
@@ -205,8 +196,7 @@ $categories = @(
     },
     @{
         Key = "units"
-        Title = "Ascendant Tiers - Units [T2]"
-        Subtitle = "All T2 robot unit frames"
+        Title = "Ascendant Tiers - Units [II]"
         Files = $units
         Cols = 5
         Rows = 3
@@ -215,8 +205,7 @@ $categories = @(
     },
     @{
         Key = "components"
-        Title = "Ascendant Tiers - Components [T2]"
-        Subtitle = "All T2 components"
+        Title = "Ascendant Tiers - Components [II]"
         Files = $components
         Cols = 8
         Rows = 5
@@ -243,13 +232,10 @@ foreach ($category in $categories) {
         $pageNumber = $page + 1
         $suffix = if ($pageCount -gt 1) { "_$pageNumber" } else { "" }
         $outputPath = Join-Path $OutputDir ("{0}{1}.png" -f $category.BaseName, $suffix)
-        $rangeText = "{0}-{1} of {2}" -f ($start + 1), ($end + 1), $files.Count
-        $subtitle = "{0} | Items {1}" -f $category.Subtitle, $rangeText
 
         Draw-CategoryPage `
             -OutputPath $outputPath `
             -Title $category.Title `
-            -Subtitle $subtitle `
             -PageFiles $pageFiles `
             -Cols $category.Cols `
             -Rows $category.Rows `

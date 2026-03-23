@@ -20,29 +20,28 @@ if not UI.IsRegistered("AscendantTiersOptions") then
 end
 
 function AscendantTiersOptions:refresh_state()
-	if Map.IsFrontEnd() then
+	local in_front_end = Map.IsFrontEnd()
+	if in_front_end then
 		self.status.text = "Open this in an active save to unlock the tech."
 		self.unlock_btn.text = "Unlock unavailable in main menu"
 		self.unlock_btn.disabled = true
-		return
+	else
+		local faction = Game.GetLocalPlayerFaction()
+		if not faction then
+			self.status.text = "No local faction available."
+			self.unlock_btn.text = "Unlock unavailable"
+			self.unlock_btn.disabled = true
+		else
+			local unlocked = faction:IsUnlocked(ASCENDANT_TIERS_TECH_ID)
+			self.status.text = unlocked
+				and "Ascendant Tiers is already unlocked for this faction."
+				or "If this save started before installing the mod, press the button once."
+			self.unlock_btn.text = unlocked
+				and "Ascendant Tiers already unlocked"
+				or "Unlock Ascendant Tiers tech"
+			self.unlock_btn.disabled = unlocked
+		end
 	end
-
-	local faction = Game.GetLocalPlayerFaction()
-	if not faction then
-		self.status.text = "No local faction available."
-		self.unlock_btn.text = "Unlock unavailable"
-		self.unlock_btn.disabled = true
-		return
-	end
-
-	local unlocked = faction:IsUnlocked(ASCENDANT_TIERS_TECH_ID)
-	self.status.text = unlocked
-		and "Ascendant Tiers is already unlocked for this faction."
-		or "If this save started before installing the mod, press the button once."
-	self.unlock_btn.text = unlocked
-		and "Ascendant Tiers already unlocked"
-		or "Unlock Ascendant Tiers tech"
-	self.unlock_btn.disabled = unlocked
 end
 
 function AscendantTiersOptions:construct()

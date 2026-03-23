@@ -85,6 +85,9 @@ local default_balance = {
 			f_storage32_t2 = 2.0,
 			f_storage48_t2 = 2.0,
 		},
+		storage_slot_bonus_overrides = {
+			f_building1x1_4s_t2 = 1,
+		},
 		construction_overrides = {
 			f_building1x1_2s_t2 = {
 				convert_ingredient = {

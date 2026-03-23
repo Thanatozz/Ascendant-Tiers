@@ -65,8 +65,6 @@ $mappings = @(
 
     # Component T2 icons: Energy
     @{ SourceRelative = "textures/icons/components/component_crystalpower_01_s.png";      TargetRelative = "textures/icons/components/c_crystal_power_t2.png" },
-    @{ SourceRelative = "textures/icons/components/component_light_01_s.png";             TargetRelative = "textures/icons/components/c_light_t2.png" },
-    @{ SourceRelative = "textures/icons/components/component_light_02_s.png";             TargetRelative = "textures/icons/components/c_light_rgb_t2.png" },
     @{ SourceRelative = "textures/icons/components/powerrelay.png";                       TargetRelative = "textures/icons/components/c_portable_relay_t2.png" },
     @{ SourceRelative = "textures/icons/components/Component_PowerRelay_01_S.png";        TargetRelative = "textures/icons/components/c_small_relay_t2.png" },
     @{ SourceRelative = "textures/icons/components/Component_SolarPanel_01_S.png";        TargetRelative = "textures/icons/components/c_solar_cell_t2.png" },

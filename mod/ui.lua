@@ -1,4 +1,7 @@
 local ASCENDANT_TIERS_TECH_ID<const> = "tech_ascendant_tiers_start"
+local ASCENDANT_TIERS_SETTINGS_KEY<const> = "ascendant_tiers"
+local EARLY_PORTABLE_CRANE_OPTION_ID<const> = "enable_early_portable_crane"
+local PORTABLE_TRANSPORTER_PROTOTYPE_LABEL<const> = "Portable Transporter Prototype"
 local watcher_added = false
 local menu_retry_hooked = setmetatable({}, { __mode = "k" })
 
@@ -7,6 +10,21 @@ local function get_local_faction()
 		return nil
 	end
 	return Game.GetLocalPlayerFaction()
+end
+
+local function get_ascendant_settings()
+	if not Map or type(Map.GetSettings) ~= "function" then
+		return {}
+	end
+	local settings = Map.GetSettings()
+	return (settings and settings[ASCENDANT_TIERS_SETTINGS_KEY]) or {}
+end
+
+local function refresh_options_widget()
+	local options = UI.FindWidget("AscendantTiersOptions")
+	if options and options.refresh_state then
+		options:refresh_state()
+	end
 end
 
 local function refresh_pause_unlock_state(menu)
@@ -104,11 +122,14 @@ function FactionAction.UnlockAscendantTiersTech(faction)
 			refresh_pause_unlock_state(menu)
 		end
 
-		local options = UI.FindWidget("AscendantTiersOptions")
-		if options and options.refresh_state then
-			options:refresh_state()
-		end
+		refresh_options_widget()
 
 		Notification.Info("Ascendant Tiers tech unlocked for this faction.")
 	end)
+end
+
+function FactionAction.SetAscendantTiersOption(faction, arg)
+	-- Option temporarily disabled to avoid persistence issues.
+	-- This action is intentionally kept as a no-op for backward compatibility.
+	return
 end
