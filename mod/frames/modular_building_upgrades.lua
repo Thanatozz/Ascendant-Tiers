@@ -7,6 +7,16 @@ local function clone_table(value)
 	return copy
 end
 
+local function tr(key, ...)
+	if type(L) == "function" then
+		return L(key, ...)
+	end
+	if select("#", ...) > 0 then
+		return string.format(key, ...)
+	end
+	return key
+end
+
 local function scale_count(base_count, factor)
 	local scaled = math.ceil(base_count * factor)
 	if scaled < (base_count + 1) then
@@ -29,6 +39,8 @@ local default_t2_material_map = {
 local t2_balance = data.ascendant_tiers_t2_balance or {}
 local building_balance = t2_balance.buildings or {}
 local t2_material_map = ((t2_balance.materials or {}).map) or default_t2_material_map
+local cost_balance = t2_balance.cost or {}
+local t2_building_recipe_cost_multiplier = tonumber(cost_balance.building_recipe_multiplier) or 1.0
 
 local function socket_scale_factor(socket_type)
 	local socket_scale = building_balance.socket_scale
@@ -78,6 +90,29 @@ local function add_amount(target, item_id, amount)
 	target[item_id] = (target[item_id] or 0) + amount
 end
 
+local function scale_recipe_ingredients(recipe, multiplier)
+	if type(recipe) ~= "table" or type(recipe.ingredients) ~= "table" then
+		return recipe
+	end
+
+	local effective_multiplier = 1.0
+	if type(multiplier) == "number" and multiplier > 0 then
+		effective_multiplier = multiplier
+	end
+
+	for item_id, amount in pairs(recipe.ingredients) do
+		if type(amount) == "number" and amount > 0 then
+			local scaled = math.ceil(amount * effective_multiplier)
+			if scaled < 1 then
+				scaled = 1
+			end
+			recipe.ingredients[item_id] = scaled
+		end
+	end
+
+	return recipe
+end
+
 local function round_up_to_10(value)
 	if type(value) ~= "number" then return value end
 	return math.max(10, math.ceil(value / 10) * 10)
@@ -111,35 +146,35 @@ local texture_overrides = {
 
 local building_plan = {
 	-- Stage 1 (Starter)
-	{ stage = 1, base_id = "f_building1x1c", t2_id = "f_building1x1_4s_t2", name = "Building 1x1 (4S) [T2]" },
-	{ stage = 1, base_id = "f_building1x1d", t2_id = "f_building1x1_2s_t2", name = "Building 1x1 (2S) [T2]" },
-	{ stage = 1, base_id = "f_building1x1f", t2_id = "f_storage16_t2", name = "Storage Block (16) [T2]" },
-	{ stage = 2, base_id = "f_building1x1g", t2_id = "f_storage32_t2", name = "Storage Block (32) [T2]" },
-	{ stage = 1, base_id = "f_building1x1h", t2_id = "f_building1x1_2m_defense_t2", name = "Defense Block (2M) [T2]" },
-	{ stage = 1, base_id = "f_building2x1f", t2_id = "f_building2x1_2m2s_t2", name = "Building 2x1 (2M2S) [T2]" },
-	{ stage = 1, base_id = "f_building2x1g", t2_id = "f_building2x1_2m_compact_t2", name = "Building 2x1 (2M) (Compact) [T2]" },
+	{ stage = 1, base_id = "f_building1x1c", t2_id = "f_building1x1_4s_t2", name = "ascendant.frame.f_building1x1_4s_t2.name" },
+	{ stage = 1, base_id = "f_building1x1d", t2_id = "f_building1x1_2s_t2", name = "ascendant.frame.f_building1x1_2s_t2.name" },
+	{ stage = 1, base_id = "f_building1x1f", t2_id = "f_storage16_t2", name = "ascendant.frame.f_storage16_t2.name" },
+	{ stage = 2, base_id = "f_building1x1g", t2_id = "f_storage32_t2", name = "ascendant.frame.f_storage32_t2.name" },
+	{ stage = 1, base_id = "f_building1x1h", t2_id = "f_building1x1_2m_defense_t2", name = "ascendant.frame.f_building1x1_2m_defense_t2.name" },
+	{ stage = 1, base_id = "f_building2x1f", t2_id = "f_building2x1_2m2s_t2", name = "ascendant.frame.f_building2x1_2m2s_t2.name" },
+	{ stage = 1, base_id = "f_building2x1g", t2_id = "f_building2x1_2m_compact_t2", name = "ascendant.frame.f_building2x1_2m_compact_t2.name" },
 
 	-- Stage 2 (Medium)
-	{ stage = 2, base_id = "f_building1x1a", t2_id = "f_building1x1_2m_t2", name = "Building 1x1 (2M) [T2]" },
-	{ stage = 3, base_id = "f_building1x1e", t2_id = "f_storage48_t2", name = "Storage Block (48) [T2]" },
-	{ stage = 2, base_id = "f_building2x1a", t2_id = "f_building2x1_4m_basic_t2", name = "Building 2x1 (4M) (Basic) [T2]" },
-	{ stage = 2, base_id = "f_building2x1c", t2_id = "f_building2x1_4m_t2", name = "Building 2x1 (4M) [T2]" },
-	{ stage = 2, base_id = "f_building2x1e", t2_id = "f_building2x1_4s2m_t2", name = "Building 2x1 (4S2M) [T2]" },
-	{ stage = 2, base_id = "f_building2x1d", t2_id = "f_building2x1_2m_storage_t2", name = "Building 2x1 (2M) (Storage) [T2]" },
-	{ stage = 2, base_id = "f_building2x2f", t2_id = "f_building2x2_4m_t2", name = "Building 2x2 (4M) [T2]" },
-	{ stage = 2, base_id = "f_building2x2b", t2_id = "f_building2x2_6m_t2", name = "Building 2x2 (6M) [T2]" },
-	{ stage = 2, base_id = "f_building2x2e", t2_id = "f_building2x2_2m6s_t2", name = "Building 2x2 (2M6S) [T2]" },
-	{ stage = 2, base_id = "f_building3x2b", t2_id = "f_building3x2_4m4s_t2", name = "Building 3x2 (4M4S) [T2]" },
+	{ stage = 2, base_id = "f_building1x1a", t2_id = "f_building1x1_2m_t2", name = "ascendant.frame.f_building1x1_2m_t2.name" },
+	{ stage = 3, base_id = "f_building1x1e", t2_id = "f_storage48_t2", name = "ascendant.frame.f_storage48_t2.name" },
+	{ stage = 2, base_id = "f_building2x1a", t2_id = "f_building2x1_4m_basic_t2", name = "ascendant.frame.f_building2x1_4m_basic_t2.name" },
+	{ stage = 2, base_id = "f_building2x1c", t2_id = "f_building2x1_4m_t2", name = "ascendant.frame.f_building2x1_4m_t2.name" },
+	{ stage = 2, base_id = "f_building2x1e", t2_id = "f_building2x1_4s2m_t2", name = "ascendant.frame.f_building2x1_4s2m_t2.name" },
+	{ stage = 2, base_id = "f_building2x1d", t2_id = "f_building2x1_2m_storage_t2", name = "ascendant.frame.f_building2x1_2m_storage_t2.name" },
+	{ stage = 2, base_id = "f_building2x2f", t2_id = "f_building2x2_4m_t2", name = "ascendant.frame.f_building2x2_4m_t2.name" },
+	{ stage = 2, base_id = "f_building2x2b", t2_id = "f_building2x2_6m_t2", name = "ascendant.frame.f_building2x2_6m_t2.name" },
+	{ stage = 2, base_id = "f_building2x2e", t2_id = "f_building2x2_2m6s_t2", name = "ascendant.frame.f_building2x2_2m6s_t2.name" },
+	{ stage = 2, base_id = "f_building3x2b", t2_id = "f_building3x2_4m4s_t2", name = "ascendant.frame.f_building3x2_4m4s_t2.name" },
 
 	-- Stage 3 (Large)
-	{ stage = 3, base_id = "f_building1x1b", t2_id = "f_building1x1_2l_t2", name = "Building 1x1 (2L) [T2]" },
-	{ stage = 3, base_id = "f_building2x1b", t2_id = "f_building2x1_2m2l_t2", name = "Building 2x1 (2M2L) [T2]" },
-	{ stage = 3, base_id = "f_building2x2a", t2_id = "f_building2x2_4m2l_t2", name = "Building 2x2 (4M2L) [T2]" },
+	{ stage = 3, base_id = "f_building1x1b", t2_id = "f_building1x1_2l_t2", name = "ascendant.frame.f_building1x1_2l_t2.name" },
+	{ stage = 3, base_id = "f_building2x1b", t2_id = "f_building2x1_2m2l_t2", name = "ascendant.frame.f_building2x1_2m2l_t2.name" },
+	{ stage = 3, base_id = "f_building2x2a", t2_id = "f_building2x2_4m2l_t2", name = "ascendant.frame.f_building2x2_4m2l_t2.name" },
 
 	-- Stage 4 (Epic)
-	{ stage = 4, base_id = "f_building2x2c", t2_id = "f_building2x2_4m2l_a_t2", name = "Building 2x2 (4M2L) (Epic A) [T2]" },
-	{ stage = 4, base_id = "f_building2x2d", t2_id = "f_building2x2_4m2l_b_t2", name = "Building 2x2 (4M2L) (Epic B) [T2]" },
-	{ stage = 4, base_id = "f_building3x2a", t2_id = "f_building3x2_2l6m_t2", name = "Building 3x2 (2L6M) [T2]" },
+	{ stage = 4, base_id = "f_building2x2c", t2_id = "f_building2x2_4m2l_a_t2", name = "ascendant.frame.f_building2x2_4m2l_a_t2.name" },
+	{ stage = 4, base_id = "f_building2x2d", t2_id = "f_building2x2_4m2l_b_t2", name = "ascendant.frame.f_building2x2_4m2l_b_t2.name" },
+	{ stage = 4, base_id = "f_building3x2a", t2_id = "f_building3x2_2l6m_t2", name = "ascendant.frame.f_building3x2_2l6m_t2.name" },
 }
 
 local function map_to_t2_if_available(item_id)
@@ -199,7 +234,7 @@ local function apply_construction_recipe_overrides(t2_id, recipe)
 				converted = math.max(convert.minimum, converted)
 			end
 
-			local round_mode = convert.round or "floor"
+			local round_mode = convert.round or "ceil"
 			if round_mode == "ceil" then
 				converted = math.ceil(converted)
 			elseif round_mode == "floor" then
@@ -247,7 +282,7 @@ end
 local function resolve_t2_desc_override(frame_id, frame_def, fallback_desc)
 	local function ensure_t2_prefix(text)
 		if type(text) ~= "string" then
-			return "<hl>[T2]</> Ascendant Tiers frame upgrade."
+			return tr("ascendant.desc.fallback.frame_upgrade")
 		end
 		if text:find("%[T2%]") then
 			return text
@@ -334,12 +369,17 @@ for _, entry in ipairs(building_plan) do
 		local frame_def = clone_table(base_frame)
 		frame_def.index = next_index
 		frame_def.name = entry.name or string.format("%s [T2]", base_frame.name or entry.base_id)
-		local fallback_desc = (base_frame.desc or "Ascendant Tiers frame variant.") ..
-			" Ascendant Tiers T2 upgrade with expanded socket capacity."
+		local base_desc = base_frame.desc or tr("ascendant.desc.fallback.frame_variant")
+		local fallback_desc = tr("ascendant.desc.fallback.frame_upgrade_with_sockets", base_desc)
 		frame_def.desc = resolve_t2_desc_override(entry.t2_id, frame_def, fallback_desc)
 		frame_def.texture = texture_overrides[entry.t2_id] or base_frame.texture
-		frame_def.construction_recipe =
-			apply_construction_recipe_overrides(entry.t2_id, build_t2_construction_recipe(base_frame) or base_frame.construction_recipe)
+		frame_def.construction_recipe = scale_recipe_ingredients(
+			apply_construction_recipe_overrides(
+				entry.t2_id,
+				build_t2_construction_recipe(base_frame) or base_frame.construction_recipe
+			),
+			t2_building_recipe_cost_multiplier
+		)
 
 		if type(base_frame.health_points) == "number" and base_frame.health_points > 0 then
 			frame_def.health_points = math.ceil(base_frame.health_points * resolve_health_multiplier(entry))

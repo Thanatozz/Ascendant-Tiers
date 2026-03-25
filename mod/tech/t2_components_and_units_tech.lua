@@ -8,11 +8,11 @@ local unit_unlocks = data.ascendant_tiers_t2_robot_units or { [1] = {}, [2] = {}
 
 local function stage_recipe(stage)
 	if stage == 1 then
-		return CreateUplinkRecipe({ ascendant_tiers_metal_plate = 35 }, 140)
+		return AscendantTiersCreateUplinkRecipe({ ascendant_tiers_metal_plate = 35 }, 140)
 	elseif stage == 2 then
-		return CreateUplinkRecipe({ ascendant_tiers_reinforced_plate = 30 }, 190)
+		return AscendantTiersCreateUplinkRecipe({ ascendant_tiers_reinforced_plate = 30 }, 190)
 	end
-	return CreateUplinkRecipe({ ascendant_tiers_energized_plate = 25, ascendant_tiers_high_density_frame = 8 }, 260)
+	return AscendantTiersCreateUplinkRecipe({ ascendant_tiers_energized_plate = 25, ascendant_tiers_high_density_frame = 8 }, 260)
 end
 
 local function stage_progress(stage)
@@ -45,15 +45,15 @@ local function tech_def(order, name, desc, requires, unlocks, stage)
 		uplink_recipe = stage_recipe(stage),
 		progress_count = stage_progress(stage),
 		require_tech = requires,
-		category = "Ascendant Tiers",
+		category = "ascendant.tech.category.name",
 		unlocks = unlocks,
 	}
 end
 
 data.techs.tech_productivity_components_t2_1 = tech_def(
 	1010,
-	"Productivity Components T2 I",
-	"Ascendant Tiers Stage I upgrades for mining, storage, repair, and shield utility components.",
+	"ascendant.tech.productivity_components_t2_1.name",
+	"ascendant.tech.productivity_components_t2_1.desc",
 	{ "tech_ascendant_tiers_start" },
 	component_unlocks.productivity[1],
 	1
@@ -61,8 +61,8 @@ data.techs.tech_productivity_components_t2_1 = tech_def(
 
 data.techs.tech_productivity_components_t2_2 = tech_def(
 	1011,
-	"Productivity Components T2 II",
-	"Ascendant Tiers Stage II upgrades for expanded productivity component sets.",
+	"ascendant.tech.productivity_components_t2_2.name",
+	"ascendant.tech.productivity_components_t2_2.desc",
 	{ "tech_productivity_components_t2_1", "tech_medium_buildings_t2" },
 	component_unlocks.productivity[2],
 	2
@@ -70,8 +70,8 @@ data.techs.tech_productivity_components_t2_2 = tech_def(
 
 data.techs.tech_productivity_components_t2_3 = tech_def(
 	1012,
-	"Productivity Components T2 III",
-	"Ascendant Tiers Stage III upgrades for high-end productivity component systems.",
+	"ascendant.tech.productivity_components_t2_3.name",
+	"ascendant.tech.productivity_components_t2_3.desc",
 	{ "tech_productivity_components_t2_2", "tech_large_buildings_t2" },
 	component_unlocks.productivity[3],
 	3
@@ -79,8 +79,8 @@ data.techs.tech_productivity_components_t2_3 = tech_def(
 
 data.techs.tech_energy_components_t2_1 = tech_def(
 	1013,
-	"Energy Components T2 I",
-	"Ascendant Tiers Stage I energy component upgrades for baseline production, lighting, and relay systems.",
+	"ascendant.tech.energy_components_t2_1.name",
+	"ascendant.tech.energy_components_t2_1.desc",
 	{ "tech_ascendant_tiers_start" },
 	component_unlocks.energy[1],
 	1
@@ -88,8 +88,8 @@ data.techs.tech_energy_components_t2_1 = tech_def(
 
 data.techs.tech_energy_components_t2_2 = tech_def(
 	1014,
-	"Energy Components T2 II",
-	"Ascendant Tiers Stage II energy upgrades for improved transmission and mid-tier power systems.",
+	"ascendant.tech.energy_components_t2_2.name",
+	"ascendant.tech.energy_components_t2_2.desc",
 	{ "tech_energy_components_t2_1", "tech_medium_buildings_t2" },
 	component_unlocks.energy[2],
 	2
@@ -97,8 +97,8 @@ data.techs.tech_energy_components_t2_2 = tech_def(
 
 data.techs.tech_energy_components_t2_3 = tech_def(
 	1015,
-	"Energy Components T2 III",
-	"Ascendant Tiers Stage III energy upgrades for dense storage and high-output power cores.",
+	"ascendant.tech.energy_components_t2_3.name",
+	"ascendant.tech.energy_components_t2_3.desc",
 	{ "tech_energy_components_t2_2", "tech_large_buildings_t2" },
 	component_unlocks.energy[3],
 	3
@@ -106,8 +106,8 @@ data.techs.tech_energy_components_t2_3 = tech_def(
 
 data.techs.tech_weaponry_components_t2_1 = tech_def(
 	1016,
-	"Weaponry Components T2 I",
-	"Ascendant Tiers Stage I weapon upgrades for portable and close-range bot armaments.",
+	"ascendant.tech.weaponry_components_t2_1.name",
+	"ascendant.tech.weaponry_components_t2_1.desc",
 	{ "tech_ascendant_tiers_start" },
 	component_unlocks.weaponry[1],
 	1
@@ -115,8 +115,8 @@ data.techs.tech_weaponry_components_t2_1 = tech_def(
 
 data.techs.tech_weaponry_components_t2_2 = tech_def(
 	1017,
-	"Weaponry Components T2 II",
-	"Ascendant Tiers Stage II weapon upgrades for medium-range and turret-grade combat systems.",
+	"ascendant.tech.weaponry_components_t2_2.name",
+	"ascendant.tech.weaponry_components_t2_2.desc",
 	{ "tech_weaponry_components_t2_1", "tech_medium_buildings_t2" },
 	component_unlocks.weaponry[2],
 	2
@@ -124,8 +124,8 @@ data.techs.tech_weaponry_components_t2_2 = tech_def(
 
 data.techs.tech_weaponry_components_t2_3 = tech_def(
 	1018,
-	"Weaponry Components T2 III",
-	"Ascendant Tiers Stage III weapon upgrades for advanced beam, viral, and plasma systems.",
+	"ascendant.tech.weaponry_components_t2_3.name",
+	"ascendant.tech.weaponry_components_t2_3.desc",
 	{ "tech_weaponry_components_t2_2", "tech_large_buildings_t2" },
 	component_unlocks.weaponry[3],
 	3
@@ -133,8 +133,8 @@ data.techs.tech_weaponry_components_t2_3 = tech_def(
 
 data.techs.tech_robot_units_t2_1 = tech_def(
 	1019,
-	"Robot Units T2 I",
-	"Ascendant Tiers Stage I robot-unit upgrades for foundational worker and cargo platforms.",
+	"ascendant.tech.robot_units_t2_1.name",
+	"ascendant.tech.robot_units_t2_1.desc",
 	{ "tech_ascendant_tiers_start" },
 	unit_unlocks[1],
 	1
@@ -142,8 +142,8 @@ data.techs.tech_robot_units_t2_1 = tech_def(
 
 data.techs.tech_robot_units_t2_2 = tech_def(
 	1020,
-	"Robot Units T2 II",
-	"Ascendant Tiers Stage II robot-unit upgrades for expanded mid-tier logistics and operations bots.",
+	"ascendant.tech.robot_units_t2_2.name",
+	"ascendant.tech.robot_units_t2_2.desc",
 	{ "tech_robot_units_t2_1", "tech_medium_buildings_t2" },
 	unit_unlocks[2],
 	2
@@ -151,8 +151,8 @@ data.techs.tech_robot_units_t2_2 = tech_def(
 
 data.techs.tech_robot_units_t2_3 = tech_def(
 	1021,
-	"Robot Units T2 III",
-	"Ascendant Tiers Stage III robot-unit upgrades for elite command and specialist bot chassis.",
+	"ascendant.tech.robot_units_t2_3.name",
+	"ascendant.tech.robot_units_t2_3.desc",
 	{ "tech_robot_units_t2_2", "tech_large_buildings_t2" },
 	unit_unlocks[3],
 	3

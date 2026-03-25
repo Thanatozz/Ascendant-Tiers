@@ -7,6 +7,16 @@ local function clone_table(value)
 	return copy
 end
 
+local function tr(key, ...)
+	if type(L) == "function" then
+		return L(key, ...)
+	end
+	if select("#", ...) > 0 then
+		return string.format(key, ...)
+	end
+	return key
+end
+
 local function scale_count(base_count, factor)
 	local scaled = math.ceil(base_count * factor)
 	if scaled < (base_count + 1) then
@@ -29,6 +39,8 @@ local default_t2_material_map = {
 local t2_balance = data.ascendant_tiers_t2_balance or {}
 local unit_balance = t2_balance.units or {}
 local t2_material_map = ((t2_balance.materials or {}).map) or default_t2_material_map
+local cost_balance = t2_balance.cost or {}
+local t2_unit_recipe_cost_multiplier = tonumber(cost_balance.unit_recipe_multiplier) or 1.0
 
 local function socket_scale_factor(socket_type)
 	local socket_scale = unit_balance.socket_scale
@@ -104,6 +116,29 @@ local function add_amount(target, item_id, amount)
 	target[item_id] = (target[item_id] or 0) + amount
 end
 
+local function scale_recipe_ingredients(recipe, multiplier)
+	if type(recipe) ~= "table" or type(recipe.ingredients) ~= "table" then
+		return recipe
+	end
+
+	local effective_multiplier = 1.0
+	if type(multiplier) == "number" and multiplier > 0 then
+		effective_multiplier = multiplier
+	end
+
+	for item_id, amount in pairs(recipe.ingredients) do
+		if type(amount) == "number" and amount > 0 then
+			local scaled = math.ceil(amount * effective_multiplier)
+			if scaled < 1 then
+				scaled = 1
+			end
+			recipe.ingredients[item_id] = scaled
+		end
+	end
+
+	return recipe
+end
+
 local function map_to_t2_if_available(item_id)
 	local mapped = t2_material_map[item_id]
 	if mapped then
@@ -137,7 +172,7 @@ end
 local function resolve_t2_desc_override(frame_id, frame_def, fallback_desc)
 	local function ensure_t2_prefix(text)
 		if type(text) ~= "string" then
-			return "<hl>[T2]</> Ascendant Tiers robot-unit upgrade."
+			return tr("ascendant.desc.fallback.robot_upgrade")
 		end
 		if text:find("%[T2%]") then
 			return text
@@ -215,11 +250,14 @@ for _, entry in ipairs(unit_plan) do
 			local frame_def = clone_table(base_frame)
 			frame_def.index = next_index
 			frame_def.name = string.format("%s [T2]", base_frame.name or entry.id)
-			local fallback_desc = (base_frame.desc or "Ascendant Tiers robot unit variant.") ..
-				" Ascendant Tiers T2 variant with expanded socket capacity."
+			local base_desc = base_frame.desc or tr("ascendant.desc.fallback.robot_variant")
+			local fallback_desc = tr("ascendant.desc.fallback.robot_upgrade_with_sockets", base_desc)
 			frame_def.desc = resolve_t2_desc_override(t2_id, frame_def, fallback_desc)
 			frame_def.texture = string.format("AscendantTiers/textures/icons/frame/%s_t2.png", entry.id)
-			frame_def.production_recipe = build_t2_production_recipe(base_frame) or base_frame.production_recipe
+			frame_def.production_recipe = scale_recipe_ingredients(
+				build_t2_production_recipe(base_frame) or base_frame.production_recipe,
+				t2_unit_recipe_cost_multiplier
+			)
 			frame_def.slots = clone_table(base_frame.slots)
 
 			if type(base_frame.health_points) == "number" and base_frame.health_points > 0 then

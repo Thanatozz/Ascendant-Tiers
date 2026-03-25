@@ -1,6 +1,6 @@
 local EARLY_CRANE_ID = "c_portablecrane_early"
 local BASE_CRANE_ID = "c_portablecrane"
-local PROTOTYPE_CRANE_NAME<const> = "Portable Transporter Prototype"
+local PROTOTYPE_CRANE_NAME<const> = "ascendant.component.c_portablecrane_early.name"
 local GENERIC_VISUAL_ID<const> = "v_generic_i"
 local PROTOTYPE_VISUAL_ID<const> = "v_portable_transporter_prototype_i"
 local PROTOTYPE_VISUAL_SCALE<const> = { 1, 1, 1.5 }
@@ -46,7 +46,7 @@ local function early_crane_definition(base_component)
 	return {
 		index = 9190,
 		name = PROTOTYPE_CRANE_NAME,
-		desc = "Experimental compact transporter prototype.",
+		desc = "ascendant.component.c_portablecrane_early.desc",
 		texture = "AscendantTiers/textures/icons/components/c_portablecrane_early_a.png",
 		visual = prototype_visual,
 		attachment_size = "Small",
@@ -57,16 +57,41 @@ local function early_crane_definition(base_component)
 	}
 end
 
-local base_component = data.components[BASE_CRANE_ID]
-if base_component and type(base_component.RegisterComponent) == "function" then
-	local definition = early_crane_definition(base_component)
+local function register_or_update_early_crane_definition()
+	if not data or type(data.components) ~= "table" then
+		return
+	end
 
-	if data.components[EARLY_CRANE_ID] then
-		local existing = data.components[EARLY_CRANE_ID]
+	local base_component = data.components[BASE_CRANE_ID]
+	if not base_component or type(base_component.RegisterComponent) ~= "function" then
+		return
+	end
+
+	local definition = early_crane_definition(base_component)
+	local existing = data.components[EARLY_CRANE_ID]
+	if type(existing) == "table" then
 		for field, field_value in pairs(definition) do
 			existing[field] = clone_table(field_value)
 		end
-	else
-		base_component:RegisterComponent(EARLY_CRANE_ID, definition)
+		return
+	end
+
+	base_component:RegisterComponent(EARLY_CRANE_ID, definition)
+end
+
+function AscendantTiersSetEarlyPortableCraneDefinitionEnabled(enabled)
+	if enabled then
+		register_or_update_early_crane_definition()
+		return
+	end
+
+	if data and type(data.components) == "table" then
+		data.components[EARLY_CRANE_ID] = nil
 	end
 end
+
+local enabled = true
+if type(AscendantTiersIsEarlyPortableCraneEnabled) == "function" then
+	enabled = AscendantTiersIsEarlyPortableCraneEnabled()
+end
+AscendantTiersSetEarlyPortableCraneDefinitionEnabled(enabled)

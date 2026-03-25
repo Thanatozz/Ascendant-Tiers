@@ -7,6 +7,16 @@ local function clone_table(value)
 	return copy
 end
 
+local function tr(key, ...)
+	if type(L) == "function" then
+		return L(key, ...)
+	end
+	if select("#", ...) > 0 then
+		return string.format(key, ...)
+	end
+	return key
+end
+
 local default_t2_material_map = {
 	metalplate = "ascendant_tiers_metal_plate",
 	reinforced_plate = "ascendant_tiers_reinforced_plate",
@@ -31,6 +41,24 @@ end
 
 local function add_amount(target, item_id, amount)
 	target[item_id] = (target[item_id] or 0) + amount
+end
+
+local function normalize_recipe_ingredients(ingredients)
+	if type(ingredients) ~= "table" then
+		return ingredients
+	end
+
+	for item_id, amount in pairs(ingredients) do
+		if type(amount) == "number" then
+			if amount > 0 then
+				ingredients[item_id] = math.max(1, math.ceil(amount))
+			else
+				ingredients[item_id] = nil
+			end
+		end
+	end
+
+	return ingredients
 end
 
 local function is_component_id(item_id)
@@ -138,6 +166,7 @@ local function build_t2_production_recipe(base_component)
 		end
 	end
 
+	normalize_recipe_ingredients(ingredients)
 	return CreateProductionRecipe(ingredients, producers, base_recipe.amount or 1)
 end
 
@@ -175,7 +204,7 @@ local function apply_recipe_overrides(component_id, recipe)
 				converted = math.max(convert.minimum, converted)
 			end
 
-			local round_mode = convert.round
+			local round_mode = convert.round or "ceil"
 			if round_mode == "ceil" then
 				converted = math.ceil(converted)
 			elseif round_mode == "floor" then
@@ -197,6 +226,7 @@ local function apply_recipe_overrides(component_id, recipe)
 		recipe.ingredients[set_ingredient.item] = set_ingredient.amount
 	end
 
+	normalize_recipe_ingredients(recipe.ingredients)
 	return recipe
 end
 
@@ -223,17 +253,31 @@ local field_desc_keywords = {
 	repair = { "repair", "repairs", "heal", "heals" },
 	trigger_radius = { "range", "radius", "repair" },
 	shield_max = { "shield", "shields" },
+	shield_charge = { "shield", "recharge", "charge" },
 	damage = { "damage", "damages" },
+	damage_air_bonus = { "air", "flying", "damage" },
 	dotdps = { "dps", "dot", "burn" },
+	dothits = { "dot", "hits", "burn" },
 	storage_slots = { "storage", "slot", "slots", "capacity" },
 	bandwidth = { "bandwidth", "transmit", "power", "transfer" },
 	power = { "power", "energy" },
 	drain_rate = { "drain", "consumes", "consumption", "upkeep" },
+	charge_rate = { "charge", "recharge", "battery" },
 	max_power = { "power", "energy" },
 	solar_power_generated = { "solar", "sunlight" },
 	solar_power_summer = { "solar", "summer" },
+	speed = { "speed", "rotation", "spin" },
 	power_storage = { "storage", "capacity", "battery", "energy" },
 	power_capacity = { "storage", "capacity", "battery", "energy" },
+	attack_radius = { "range", "radius", "attack" },
+	duration = { "duration", "time", "seconds" },
+	shoot_speed = { "speed", "rate", "fire" },
+	beam_range = { "beam", "range" },
+	blast = { "blast", "radius", "area" },
+	pulse = { "pulse", "size", "radius" },
+	disruptor = { "disrupt", "disruptor" },
+	minimum_range = { "minimum", "min", "range" },
+	miner_range = { "range", "mining" },
 	transfer_radius = { "range", "radius", "field", "relay", "transmit" },
 	range = { "range", "radius", "field", "relay", "transmit" },
 	power_range = { "range", "radius", "field", "relay", "transmit" },
@@ -384,6 +428,17 @@ local function apply_primary_role_scaling(base_component_id, base_component, com
 			component_def.shield_max = scaled_shield
 			collect_stat_change(base_component, "shield_max", scaled_shield, stat_changes)
 		end
+
+		local scaled_shield_charge = scaled_number(
+			base_component,
+			"shield_charge",
+			component_stat_multiplier("shield_charge", 1),
+			true
+		)
+		if scaled_shield_charge then
+			component_def.shield_charge = scaled_shield_charge
+			collect_stat_change(base_component, "shield_charge", scaled_shield_charge, stat_changes)
+		end
 	end
 
 	if damage_components[base_component_id] then
@@ -397,6 +452,25 @@ local function apply_primary_role_scaling(base_component_id, base_component, com
 		if scaled_dot then
 			component_def.dotdps = scaled_dot
 			collect_stat_change(base_component, "dotdps", scaled_dot, stat_changes)
+		end
+
+		for _, field in ipairs({
+			"attack_radius",
+			"duration",
+			"shoot_speed",
+			"beam_range",
+			"blast",
+			"damage_air_bonus",
+			"dothits",
+			"pulse",
+			"disruptor",
+			"minimum_range",
+		}) do
+			local scaled_value = scaled_number(base_component, field, component_stat_multiplier(field, 1), true)
+			if scaled_value then
+				component_def[field] = scaled_value
+				collect_stat_change(base_component, field, scaled_value, stat_changes)
+			end
 		end
 	end
 
@@ -434,9 +508,26 @@ local function apply_primary_role_scaling(base_component_id, base_component, com
 			component_def.solar_power_summer = scaled_solar_summer
 			collect_stat_change(base_component, "solar_power_summer", scaled_solar_summer, stat_changes)
 		end
+
+		local scaled_speed = scaled_number(base_component, "speed", component_stat_multiplier("speed", 1), true)
+		if scaled_speed then
+			component_def.speed = scaled_speed
+			collect_stat_change(base_component, "speed", scaled_speed, stat_changes)
+		end
 	end
 
 	if battery_components[base_component_id] then
+		local scaled_charge_rate = scaled_number(
+			base_component,
+			"charge_rate",
+			component_stat_multiplier("charge_rate", 1),
+			true
+		)
+		if scaled_charge_rate then
+			component_def.charge_rate = scaled_charge_rate
+			collect_stat_change(base_component, "charge_rate", scaled_charge_rate, stat_changes)
+		end
+
 		local scaled_storage = scaled_number(
 			base_component,
 			"power_storage",
@@ -535,6 +626,19 @@ local function apply_primary_role_scaling(base_component_id, base_component, com
 		end
 	end
 
+	if miner_components[base_component_id] then
+		local scaled_miner_range = scaled_number(
+			base_component,
+			"miner_range",
+			component_stat_multiplier("miner_range", 1),
+			true
+		)
+		if scaled_miner_range then
+			component_def.miner_range = scaled_miner_range
+			collect_stat_change(base_component, "miner_range", scaled_miner_range, stat_changes)
+		end
+	end
+
 	return stat_changes
 end
 
@@ -544,6 +648,7 @@ local function apply_mining_speed_overrides(base_component_id, t2_component_id)
 	end
 
 	local ticks_divisor = tonumber(component_mining_balance.ticks_divisor) or 2.0
+	local efficiency_divisor = tonumber(component_mining_balance.efficiency_divisor) or 1.0
 	local min_ticks = tonumber(component_mining_balance.min_ticks) or 1
 
 	for _, item_def in pairs(data.items) do
@@ -551,8 +656,12 @@ local function apply_mining_speed_overrides(base_component_id, t2_component_id)
 		local base_ticks = type(mining_recipe) == "table" and mining_recipe[base_component_id]
 		if type(base_ticks) == "number" and base_ticks > 0 then
 			local scaled_ticks = base_ticks
-			if ticks_divisor > 0 then
-				scaled_ticks = scaled_ticks / ticks_divisor
+			local effective_divisor = ticks_divisor
+			if base_component_id == "c_adv_miner" and efficiency_divisor > 0 then
+				effective_divisor = effective_divisor * efficiency_divisor
+			end
+			if effective_divisor > 0 then
+				scaled_ticks = scaled_ticks / effective_divisor
 			end
 			mining_recipe[t2_component_id] = math.max(min_ticks, math.floor(scaled_ticks))
 		end
@@ -563,10 +672,7 @@ local function upgraded_desc(base_component, base_name, stat_changes)
 	local original_desc = type(base_component.desc) == "string" and base_component.desc or ""
 	local desc_body = replace_stat_values_in_desc(original_desc, stat_changes or {})
 	if desc_body == "" then
-		desc_body = string.format(
-			"%s variant with increased efficiency in its primary function (role-focused, not flat scaling).",
-			base_name
-		)
+		desc_body = tr("ascendant.desc.fallback.component_role_variant", base_name)
 	end
 	if desc_body:find("%[T2%]") then
 		return desc_body
@@ -577,7 +683,7 @@ end
 local function resolve_t2_desc_override(item_id, item_def, fallback_desc)
 	local function ensure_t2_prefix(text)
 		if type(text) ~= "string" then
-			return "<hl>[T2]</> Ascendant Tiers component upgrade."
+			return tr("ascendant.desc.fallback.component_upgrade")
 		end
 		if text:find("%[T2%]") then
 			return text

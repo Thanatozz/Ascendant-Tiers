@@ -6,6 +6,16 @@ local function ticks_per_second()
 	return 1
 end
 
+local function tr(key, ...)
+	if type(L) == "function" then
+		return L(key, ...)
+	end
+	if select("#", ...) > 0 then
+		return string.format(key, ...)
+	end
+	return key
+end
+
 local function rounded(value)
 	return math.floor(value + 0.5)
 end
@@ -201,20 +211,20 @@ local function wind_outputs_raw(component)
 	return base_output, peak_output
 end
 
-local function battery_desc(component, label)
+local function battery_desc(component, label_key)
 	local capacity = battery_capacity(component)
 	if capacity > 0 then
-		return string.format("<hl>[T2]</> %s that stores up to <hl>%s</> power.", label, format_number(capacity))
+		return tr("ascendant.desc.battery.with_capacity", tr(label_key), format_number(capacity))
 	end
-	return string.format("<hl>[T2]</> %s with improved storage capacity.", label)
+	return tr("ascendant.desc.battery.fallback", tr(label_key))
 end
 
-local function relay_desc(component, label)
+local function relay_desc(component, label_key)
 	local radius = relay_radius(component)
 	if radius > 0 then
-		return string.format("<hl>[T2]</> %s extending your power field by <hl>%s</> tiles.", label, format_number(radius))
+		return tr("ascendant.desc.relay.with_radius", tr(label_key), format_number(radius))
 	end
-	return string.format("<hl>[T2]</> %s with extended power field coverage.", label)
+	return tr("ascendant.desc.relay.fallback", tr(label_key))
 end
 
 local desc_overrides = {
@@ -222,32 +232,26 @@ local desc_overrides = {
 		local daylight_output = effective_power_per_second(first_field(component, { "solar_power_generated", "power" }))
 		local summer_output = effective_power_per_second(first_field(component, { "solar_power_summer" }))
 		if summer_output > 0 then
-			return string.format(
-				"<hl>[T2]</> Photovoltaic cell that supplies <hl>%s</> power to your grid during daylight, with increased output up to <hl>%s</> throughout summer.",
+			return tr(
+				"ascendant.desc.solar_cell.with_summer",
 				format_number(daylight_output),
 				format_number(summer_output)
 			)
 		end
-		return string.format(
-			"<hl>[T2]</> Photovoltaic cell that supplies <hl>%s</> power to your grid during daylight.",
-			format_number(daylight_output)
-		)
+		return tr("ascendant.desc.solar_cell.basic", format_number(daylight_output))
 	end,
 
 	c_solar_panel_t2 = function(component)
 		local daylight_output = effective_power_per_second(first_field(component, { "solar_power_generated", "power" }))
 		local summer_output = effective_power_per_second(first_field(component, { "solar_power_summer" }))
 		if summer_output > 0 then
-			return string.format(
-				"<hl>[T2]</> Advanced photovoltaic panel that delivers <hl>%s</> daytime power and up to <hl>%s</> during summer peaks.",
+			return tr(
+				"ascendant.desc.solar_panel.with_summer",
 				format_number(daylight_output),
 				format_number(summer_output)
 			)
 		end
-		return string.format(
-			"<hl>[T2]</> Advanced photovoltaic panel that delivers <hl>%s</> daytime power.",
-			format_number(daylight_output)
-		)
+		return tr("ascendant.desc.solar_panel.basic", format_number(daylight_output))
 	end,
 
 	c_wind_turbine_t2 = function(component)
@@ -255,16 +259,13 @@ local desc_overrides = {
 		local base_output = effective_power_per_second(base_output_raw)
 		local peak_output = effective_power_per_second(peak_output_raw)
 		if base_output > 0 and peak_output > 0 then
-			return string.format(
-				"<hl>[T2]</> Constant <hl>%s</> power generation per second, <hl>%s</> when located on the plateau.",
+			return tr(
+				"ascendant.desc.wind_turbine.with_peak",
 				format_number(base_output),
 				format_number(peak_output)
 			)
 		end
-		return string.format(
-			"<hl>[T2]</> Wind turbine that generates <hl>%s</> power.",
-			format_number(base_output)
-		)
+		return tr("ascendant.desc.wind_turbine.basic", format_number(base_output))
 	end,
 
 	c_wind_turbine_l_t2 = function(component)
@@ -272,16 +273,13 @@ local desc_overrides = {
 		local base_output = effective_power_per_second(base_output_raw)
 		local peak_output = effective_power_per_second(peak_output_raw)
 		if base_output > 0 and peak_output > 0 then
-			return string.format(
-				"<hl>[T2]</> Large wind turbine with constant <hl>%s</> power generation per second, <hl>%s</> when located on the plateau.",
+			return tr(
+				"ascendant.desc.wind_turbine_large.with_peak",
 				format_number(base_output),
 				format_number(peak_output)
 			)
 		end
-		return string.format(
-			"<hl>[T2]</> Large wind turbine that generates <hl>%s</> power.",
-			format_number(base_output)
-		)
+		return tr("ascendant.desc.wind_turbine_large.basic", format_number(base_output))
 	end,
 
 	c_crystal_power_t2 = function(component)
@@ -293,135 +291,135 @@ local desc_overrides = {
 		end
 		local crystal_drain = per_second(first_field(component, { "drain_rate" }))
 		if storage > 0 and generated_power > 0 then
-			return string.format(
-				"<hl>[T2]</> Crystal reactor that stores up to <hl>%s</> power, outputs up to <hl>%s</>, and consumes <hl>%s</> crystal per second.",
+			return tr(
+				"ascendant.desc.crystal_reactor.full",
 				format_number(storage),
 				format_number(generated_power),
 				format_number(crystal_drain)
 			)
 		end
 		if storage > 0 then
-			return string.format(
-				"<hl>[T2]</> Crystal reactor that stores up to <hl>%s</> power while consuming <hl>%s</> crystal per second.",
+			return tr(
+				"ascendant.desc.crystal_reactor.storage_only",
 				format_number(storage),
 				format_number(crystal_drain)
 			)
 		end
-		return string.format(
-			"<hl>[T2]</> Crystal reactor that converts fuel into <hl>%s</> power while consuming <hl>%s</> crystal per second.",
+		return tr(
+			"ascendant.desc.crystal_reactor.generation_only",
 			format_number(generated_power),
 			format_number(crystal_drain)
 		)
 	end,
 
 	c_small_battery_t2 = function(component)
-		return battery_desc(component, "Compact battery module")
+		return battery_desc(component, "ascendant.desc.label.compact_battery_module")
 	end,
 
 	c_capacitor_t2 = function(component)
-		return battery_desc(component, "Rapid capacitor bank")
+		return battery_desc(component, "ascendant.desc.label.rapid_capacitor_bank")
 	end,
 
 	c_medium_capacitor_t2 = function(component)
-		return battery_desc(component, "Medium capacitor bank")
+		return battery_desc(component, "ascendant.desc.label.medium_capacitor_bank")
 	end,
 
 	c_battery_t2 = function(component)
-		return battery_desc(component, "High-capacity battery")
+		return battery_desc(component, "ascendant.desc.label.high_capacity_battery")
 	end,
 
 	c_power_cell_t2 = function(component)
 		local capacity = battery_capacity(component)
 		local output = effective_power_per_second(first_field(component, { "power", "max_power" }))
 		if capacity > 0 and output > 0 then
-			return string.format(
-				"<hl>[T2]</> Hybrid power cell that stores <hl>%s</> power and provides up to <hl>%s</> output.",
+			return tr(
+				"ascendant.desc.power_cell.full",
 				format_number(capacity),
 				format_number(output)
 			)
 		end
-		return battery_desc(component, "Hybrid power cell")
+		return battery_desc(component, "ascendant.desc.label.hybrid_power_cell")
 	end,
 
 	c_power_core_t2 = function(component)
 		local capacity = battery_capacity(component)
 		local output = effective_power_per_second(first_field(component, { "power", "max_power" }))
 		if capacity > 0 and output > 0 then
-			return string.format(
-				"<hl>[T2]</> Power core with <hl>%s</> storage and up to <hl>%s</> output.",
+			return tr(
+				"ascendant.desc.power_core.full",
 				format_number(capacity),
 				format_number(output)
 			)
 		end
-		return battery_desc(component, "Power core")
+		return battery_desc(component, "ascendant.desc.label.power_core")
 	end,
 
 	c_portable_relay_t2 = function(component)
-		return relay_desc(component, "Portable power relay")
+		return relay_desc(component, "ascendant.desc.label.portable_power_relay")
 	end,
 
 	c_small_relay_t2 = function(component)
-		return relay_desc(component, "Small relay node")
+		return relay_desc(component, "ascendant.desc.label.small_relay_node")
 	end,
 
 	c_power_relay_t2 = function(component)
-		return relay_desc(component, "Power relay")
+		return relay_desc(component, "ascendant.desc.label.power_relay")
 	end,
 
 	c_power_transmitter_t2 = function(component)
-		return relay_desc(component, "Power transmitter")
+		return relay_desc(component, "ascendant.desc.label.power_transmitter")
 	end,
 
 	c_large_power_transmitter_t2 = function(component)
-		return relay_desc(component, "Large power transmitter")
+		return relay_desc(component, "ascendant.desc.label.large_power_transmitter")
 	end,
 
 	c_small_storage_t2 = function(component)
 		local slots = component_storage_slots(component)
 		if slots > 0 then
-			return string.format("<hl>[T2]</> Expands storage of Frame by <hl>%s slots</>.", format_number(slots))
+			return tr("ascendant.desc.storage.expand_slots", format_number(slots))
 		end
-		return "<hl>[T2]</> Expands storage of Frame with additional slots."
+		return tr("ascendant.desc.storage.expand_fallback")
 	end,
 
 	c_medium_storage_t2 = function(component)
 		local slots = component_storage_slots(component)
 		if slots > 0 then
-			return string.format("<hl>[T2]</> Expands storage of Frame by <hl>%s slots</>.", format_number(slots))
+			return tr("ascendant.desc.storage.expand_slots", format_number(slots))
 		end
-		return "<hl>[T2]</> Expands storage of Frame with additional slots."
+		return tr("ascendant.desc.storage.expand_fallback")
 	end,
 
 	c_large_storage_t2 = function(component)
 		local slots = component_storage_slots(component)
 		if slots > 0 then
-			return string.format("<hl>[T2]</> A larger storage component with <hl>%s slots</>.", format_number(slots))
+			return tr("ascendant.desc.storage.large_slots", format_number(slots))
 		end
-		return "<hl>[T2]</> A larger storage component with expanded capacity."
+		return tr("ascendant.desc.storage.large_fallback")
 	end,
 
 	f_storage16_t2 = function(frame_def)
 		local slots = storage_slots(frame_def)
 		if slots > 0 then
-			return string.format("<hl>[T2]</> Storage block with capacity for <hl>%s</> item stacks.", format_number(slots))
+			return tr("ascendant.desc.storage_block.slots", format_number(slots))
 		end
-		return "<hl>[T2]</> Storage block with expanded capacity."
+		return tr("ascendant.desc.storage_block.fallback")
 	end,
 
 	f_storage32_t2 = function(frame_def)
 		local slots = storage_slots(frame_def)
 		if slots > 0 then
-			return string.format("<hl>[T2]</> Storage block with capacity for <hl>%s</> item stacks.", format_number(slots))
+			return tr("ascendant.desc.storage_block.slots", format_number(slots))
 		end
-		return "<hl>[T2]</> Storage block with expanded capacity."
+		return tr("ascendant.desc.storage_block.fallback")
 	end,
 
 	f_storage48_t2 = function(frame_def)
 		local slots = storage_slots(frame_def)
 		if slots > 0 then
-			return string.format("<hl>[T2]</> Storage block with capacity for <hl>%s</> item stacks.", format_number(slots))
+			return tr("ascendant.desc.storage_block.slots", format_number(slots))
 		end
-		return "<hl>[T2]</> Storage block with expanded capacity."
+		return tr("ascendant.desc.storage_block.fallback")
 	end,
 }
 
